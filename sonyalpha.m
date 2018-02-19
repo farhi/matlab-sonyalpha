@@ -10,14 +10,19 @@ classdef sonyalpha < handle
   %
   % Then you can use the Methods:
   %   getstatus(camera):  get the camera status
+  %   start:              set the camera ready for shooting pictures
+  %   stop:               stop the shooting mode
+  %
   %   iso:                set/get ISO setting
   %   shutter:            set/get shutter speed setting
   %   mode:               set/get the PASM mode
   %   timer:              set/get the self timer
   %   fnumber:            set/get the F/D aperture
   %   white:              set/get the white balance
-  %   image:              take a shot and display it
-  %   imread:             take a shot and download the image (no display)
+  %
+  %   urlread:            take a picture and return the distant URL (no download)
+  %   imread:             take a picture and download the RGB image (no display)
+  %   image:              take a picture and display it
   %
   % Connecting the Camera
   % ---------------------
@@ -48,11 +53,14 @@ classdef sonyalpha < handle
   % -------
   % https://github.com/micolous/gst-plugins-sonyalpha
   % https://github.com/Bloodevil/sony_camera_api
+  % https://developer.sony.com/develop/cameras/#overview-content
   %
   % (c) E. Farhi, GPL2, 2018.
 
   properties
     url           = 'http://192.168.122.1:8080/sony/camera';
+    
+    % settings, updated on getstatus
     exposureMode  = '';
     cameraStatus  = '';
     selfTimer     = '';
@@ -64,7 +72,17 @@ classdef sonyalpha < handle
     isoSpeedRate  = '';
     shutterSpeed  = '';
     whiteBalance  = '';
+    
     status        = '';
+    version       = '';
+    updateTimer   = '';
+    
+    % continuous/timelapse modes
+    continuous_mode = 0;
+    timelapse_mode  = 0;
+    timelapse_clock = 0;
+    timelapse_interval = 0;
+
   end % properties
   
   methods
@@ -73,20 +91,27 @@ classdef sonyalpha < handle
       if nargin > 1
         self.url = url;
       end
-
-      self.startRecMode;
-      self.getstatus;
       
+      self.version = self.get('getApplicationInfo');
+      
+      % init timer for regular updates, timelapse, etc
+      self.updateTimer  = timer('TimerFcn', @TimerCallback, ...
+          'Period', 5.0, 'ExecutionMode', 'fixedDelay', 'UserData', self, ...
+          'Name', mfilename);
+
+      self.start;
+      disp([ mfilename ': [' datestr(now) '] Welcome to Sony Alpha ' char(self.version) ' at ' self.url ])
+
     end % sonyalpha
     
-    % INIT and INFO stuff
+    % INFO stuff
     function status = getstatus(self)
       % getstatus: get the Camera status and all settings
       json = '{"method": "getEvent", "params": [false], "id": 1, "version": "1.2"}';
       [ret, message] = curl(self.url, json);
       message = loadjson(message);
       message = message.result;
-      status = struct();
+      status  = struct();
       status.unsorted ={};
       for index=1:numel(message)
         this = message{index};
@@ -97,11 +122,11 @@ classdef sonyalpha < handle
             status.(this.type) = status.(this.type){1};
           end
         elseif isfield(this, 'type')
+          status.(this.type) = this;
+        else
           if iscell(this) && numel(this) == 1
             this = this{1};
           end
-          status.(this.type) = this;
-        else
           status.unsorted{end+1} = this;
         end
       end
@@ -121,102 +146,91 @@ classdef sonyalpha < handle
         self.shutterSpeed = status.shutterSpeed.currentShutterSpeed;
         self.whiteBalance = status.whiteBalance.currentWhiteBalanceMode;
       end
-    end
-    
-    function ret=getApplicationInfo(self)
-      ret = self.get('getApplicationInfo');
-    end
-    
-    function ret=getAvailableApiList(self)
-      ret = self.get('getAvailableApiList');
-    end
-    
-    function ret=getVersions(self)
-      ret = self.get('getVersions');
-    end
+    end % getstatus
     
     % generic get for most API commands ------------------------------------
-    function ret=get(self, getAPI)
-      % getAPI can be any  Sony API call without argument
-      %
-      % getApplicationInfo
-      % getAvailableApiList
-      % getVersions
-      %
-      % startRecMode
-      % actTakePicture
-      % getAvailableExposureMode
-      % getAvailableFocusMode
-      % getAvailableSelfTimer
-      % getAvailableExposureCompensation
-      % getAvailableFNumber
-      % getAvailableShutterSpeed
-      % getWhiteBalance
-      % getIsoSpeedRate
-      % getAvailablePostviewImageSize
-      json = [ '{"method": "' getAPI '","params": [],"id": 1,"version": "1.0"}' ];
+    function ret = get(self, method)
+      % get('method'):  get the given API method call (no argument)
+      json = [ '{"method": "' method '","params": [],"id": 1,"version": "1.0"}' ];
       ret  = curl(self.url, json);
-    end
+    end % get
     
-    function ret=set(self, getAPI, value)
-      % 'setSelfTimer',    (0, 2 or 10)
-      % 'setExposureMode', ('Program Auto','Aperture', 'Shutter', 'Manual', 'Intelligent Auto')
-      % 'setFocusMode',    ('AF-S'    'AF-C'    'DMF'    'MF')
-      % 'setExposureCompensation', (-9:9) per 1/3 EV
-      % 'setFNumber',      (e.g. '3.5')
-      % 'setShutterSpeed'  (e.g. '1/15')
-      % 'setIsoSpeedRate'  ('AUTO'    '100'    '200'    '400'    '800'    '1600'    '3200'    '6400'    '12800'  '25600')
-      % 'setPostviewImageSize' ('Original'    '2M') <- faster image transfer
+    function ret = set(self, method, value)
+      % set('method', param): get the given API method call (with argument)
       if isnumeric(value),  value = num2str(value);
       elseif ischar(value), value = [ '"' value '"' ];
       elseif islogical(value)
         if value, value = 'true'; else value = 'false'; end
       end
-      json = [ '{"method": "' getAPI '","params": [' value '],"id": 1,"version": "1.0"}' ];
+      json = [ '{"method": "' method '","params": [' value '],"id": 1,"version": "1.0"}' ];
       ret  = curl(self.url, json);
-    end
+    end % set
     
     % Camera Shooting ----------------------------------------------------------
-    function ret=startRecMode(self)
+    function ret = start(self)
+      % start: set the camera into shooting mode
       ret = self.get('startRecMode');
-    end
+      self.getstatus;
+      start(self.updateTimer);
+    end % start
     
-    function ret=close(self)
-      ret=self.get('stopRecMode');
-    end
+    function ret = stop(self)
+      % stop: stop the camera shooting mode
+      ret = self.get('stopRecMode');
+      self.continuous_mode = false;
+      self.timelapse_mode  = false;
+    end % stop
     
-    function url=actTakePicture(self)
-      url = self.get('actTakePicture');
-    end
+    function url = urlread(self)
+      % urlread: take a picture and return the distant URL (no upload)
+      % must have used 'start' before (e.g. at init).
+      url = char(self.get('actTakePicture'));
+    end % urlread
     
-    % upper level camera shooting and display
-    function [im, exif] = imread(self)
-    
-      url  = self.actTakePicture;
-      % get the extension
-      [p, f, e] = fileparts(char(url));
+    function im = urlwrite(self, filename)
+      % urlread: take a picture, and download it as a local file
+      % must have used 'start' before (e.g. at init).
       
+      if nargin < 2, filename = ''; end
+      
+      % get the URL and its extension
+      url = self.urlread;
+      [p, f, ext] = fileparts(url);
+        
+      if isempty(filename)
+        filename = [ f e ]; % saves locally using the distant image name
+      else
+        % check extension
+        [p,f,E] = fileparts(filename);
+        if isempty(E), filename = [ filename ext ]; end
+      end
       % then get URL and display it
-      file = [ tempname e ]
-      im   = urlwrite(char(url), file);
-      im   = imread(im);
+      im   = urlwrite(url, filename);
+    end % urlwrite
+    
+    function [im, exif] = imread(self)
+      % imread: take a picture, and read it as an RGB matrix.
+      %
+      % [im, exif] = imread(s)
+      %   returns the EXIF data.
+      filename = tempname;
+      url  = self.urlwrite(filename);
+      
+      im   = imread(url); % local file
       if nargout > 1, exif = imfinfo(file); end
-      delete(file);
+      delete(filename);
      
     end % imread
     
     function h = image(self)
       h = image(self.imread);
-    end
-    
-    function h = plot(self)
-      h = image(self.imread);
-    end
+    end % image
     
     % Camera settings ----------------------------------------------------------
     function ret = iso(self, value)
       % iso(s):        get the ISO setting as a string (can be 'AUTO')
       % iso(s, 'iso'): set the ISO setting as a string (can be 'AUTO')
+      % iso(s, 'supported') return supported ISO settings (strings)
       %
       % The ISO value can be e.g. AUTO 100 200 400 800 1600 3200 6400 12800 25600 
       if nargin < 2, value = ''; end
@@ -227,11 +241,12 @@ classdef sonyalpha < handle
       else
         ret = self.set('setIsoSpeedRate', num2str(value));
       end
-    end
+    end % iso
     
     function ret = mode(self, value)
       % mode(s):         get the shooting Mode (e.g. PASM)
       % mode(s, 'PASM'): set the shooting Mode (e.g. PASM) as a string
+      % mode(s, 'supported') return supported shooting Modes (strings)
       %
       % The shooting Mode can be 'Program Auto', 'Aperture', 'Shutter', 'Manual'
       %   'Intelligent Auto', or 'P', 'A', 'S', 'M'
@@ -255,11 +270,12 @@ classdef sonyalpha < handle
         end
         ret = self.set('setExposureMode', value);
       end
-    end
+    end % mode
     
     function ret = timer(self, value)
       % timer(s):      get the self Timer setting
       % timer(s, val): set the self Timer setting in seconds
+      % timer(s, 'supported') return supported self Timer settings (numeric)
       %
       % The self Timer value can be e.g. 0, 2 or 10 (numeric)
       if nargin < 2, value = ''; end
@@ -270,11 +286,12 @@ classdef sonyalpha < handle
       else
         ret = self.set('setSelfTimer', num2str(value));
       end
-    end
+    end % timer
     
     function ret = shutter(self, value)
       % shutter(s):      get the shutter speed setting (S mode)
       % shutter(s, val): set the shutter speed setting (S mode) as a string
+      % shutter(s, 'supported') return supported shutter speed settings (strings)
       %
       % The shutter speed value can be e.g. '30"', '1"', '1/2', '1/30', '1/250' (string)
       %   where the " symbol stands for seconds.
@@ -286,11 +303,12 @@ classdef sonyalpha < handle
       else
         ret = self.set('setShutterSpeed', num2str(value));
       end
-    end
+    end % shutter
     
     function ret = fnumber(self, value)
       % fnumber(s):      get the F/D number (apperture) setting (A mode)
       % fnumber(s, val): set the F/D number (apperture) setting (A mode) as a string
+      % fnumber(s, 'supported') return supported F/D numbers (strings)
       %
       % The F/D number value can be e.g. '1.4','2.0','2.8','4.0','5.6'
       if nargin < 2, value = ''; end
@@ -301,11 +319,12 @@ classdef sonyalpha < handle
       else
         ret = self.set('setFNumber', num2str(value));
       end
-    end
+    end % fnumber
     
     function ret = white(self, value)
       % white(s):      get the white balance setting
       % white(s, val): set the white balance setting
+      % white(s, 'supported') return supported white balance modes (strings)
       %
       % The white balance can be a string such as 
       %  'Auto WB'
@@ -334,12 +353,38 @@ classdef sonyalpha < handle
           ret = curl(self.url, json);
         end
       end
+    end % white
+    
+    % upper level continuous/timelapse modes
+    function continuous(self)
+      % timelapse: take a picture continuously
+      if self.continuous_mode
+        % stop after next capture
+        self.continuous_mode = false;
+        disp([ mfilename ': stopping continuous shooting' ])
+      else
+        self.continuous_mode = true;
+        disp([ mfilename ': starting continuous shooting' ])
+      end
+    end % continuous
+    
+    function timelapse(self, wait)
+      % timelapse: take a picture with current settings every 'wait' seconds
+      if self.timelapse_mode
+        % stop after next capture
+        self.timelapse_mode = false;
+        disp([ mfilename ': stopping timelapse shooting' ])
+      else
+        self.timelapse_mode     = true;
+        self.timelapse_interval = wait;
+        self.timelapse_clock    = clock;
+      end
     end
     
     
   end % methods
   
-end
+end % sonyalpha class
 
 % internal communication done with curl ----------------------------------------
 
@@ -366,7 +411,7 @@ function message = curl(url, post)
     message.result = strrep(message.result', '\/','/');
   end
   if isstruct(message) && numel(fieldnames(message)) == 2
-    if  isfield(message, 'result') && isfield(message, 'id') && message.id == 1
+    if  isfield(message, 'result')
       message = message.result;
     elseif isfield(message, 'error')
       message = message.error;
@@ -375,5 +420,24 @@ function message = curl(url, post)
   if iscell(message) && numel(message) == 1
     message = message{1};
   end
-end
+end % curl
+
+function TimerCallback(src, evnt)
+  % TimerCallback: update from timer event
+  self = get(src, 'UserData');
+  if isvalid(self), self.getstatus; 
+  else delete(src); return; end
+  
+  % handle continuous shooting mode
+  if strcmpi(self.cameraStatus,'IDLE')
+    if self.continuous_mode
+      url = self.urlread;
+      disp([ mfilename ': [' datestr(now) '] continuous shooting ' url ]);
+    elseif self.timelapse_mode && etime(clock, self.timelapse_clock) > self.timelapse_interval
+      self.timelapse_clock     = clock;
+      url = self.urlread;
+      disp([ mfilename ': [' datestr(now) '] timelapse ' url ]);
+    end
+  
+end % TimerCallback
 
