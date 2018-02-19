@@ -1,6 +1,70 @@
 # matlab-sonyalpha
 Control a Sony Alpha Camera
 
+SONYALPHA A class to control a Sony Alpha Camera (NEX, Alpha, ...) compatible
+  with the Camera Remote API by Sony.
+ 
+Usage
+-----
+
+```matlab
+>> camera = sonyalpha;
+```
+ 
+Then you can use the Methods:
+- getstatus(camera):  get the camera status
+- iso:                set/get ISO setting
+- shutter:            set/get shutter speed setting
+- mode:               set/get the PASM mode
+- timer:              set/get the self timer
+- fnumber:            set/get the F/D aperture
+- white:              set/get the white balance
+- image:              take a shot and display it
+- imread:             take a shot and download the image (no display)
+ 
+Connecting the Camera
+---------------------
+  
+  Start your camera and use its Remote Control App (e.g. Play Memories App) 
+  from the Camera settings. This starts the JSON REST HTTP server, used to 
+  control the camera. The Network SSID is shown on the Camera screen.
+  Connect from your PC on that network.
+  The usual associated IP is then 192.168.122.1 (port 8080)
+ 
+  The connection must be a dedicated ad-hoc, e.g. can NOT use an intermediate 
+  router. If you are already connected to the Internet, you have to drop your
+  current connection, or use an additional Wifi adapter (e.g. USB-Wifi).
+  
+Requirements/Installation
+-------------------------
+
+- Matlab, no external toolbox
+- A wifi connection
+- A Sony Camera
+- curl
+- ffmpeg (for liveview)
+
+Just copy the files and go into the directory. Then type commands above, once the
+camera is configured (see above).
+ 
+Credits
+-------
+
+- https://github.com/micolous/gst-plugins-sonyalpha
+- https://github.com/Bloodevil/sony_camera_api
+ 
+(c) E. Farhi, GPL2, 2018.
+
+
+
+
+
+
+
+
+Here are other commenst which I currently use to develop this class (not yet finished)
+--------------------------------------------------------------------------------------
+
 You need to start the PlayMemories Remote Control App on the camera. The Camera should be connected using an ad-hoc network, which SSID is shown on the camera screen. The Camera IP will then be:
 
 http://192.168.122.1:8080
