@@ -222,6 +222,8 @@ classdef sonyalpha < handle
       if nargin < 2, value = ''; end
       if isempty(value)
         ret = get(self, 'getIsoSpeedRate');
+      elseif strcmp(lower(value), 'available') || strcmp(lower(value), 'supported')
+        ret = get(self, 'getSupportedIsoSpeedRate');
       else
         ret = self.set('setIsoSpeedRate', num2str(value));
       end
@@ -242,6 +244,8 @@ classdef sonyalpha < handle
         case 'Shutter';      ret = 'S';
         case 'Manual';       ret = 'M';
         end
+      elseif strcmp(lower(value), 'available') || strcmp(lower(value), 'supported')
+        ret = get(self, 'getSupportedExposureMode');
       else
         switch upper(value(1))
         case 'P'; value = 'Program Auto';
@@ -261,6 +265,8 @@ classdef sonyalpha < handle
       if nargin < 2, value = ''; end
       if isempty(value)
         ret = get(self, 'getSelfTimer');
+      elseif strcmp(lower(value), 'available') || strcmp(lower(value), 'supported')
+        ret = get(self, 'getSupportedSelfTimer');
       else
         ret = self.set('setSelfTimer', num2str(value));
       end
@@ -275,6 +281,8 @@ classdef sonyalpha < handle
       if nargin < 2, value = ''; end
       if isempty(value)
         ret = get(self, 'getShutterSpeed');
+      elseif strcmp(lower(value), 'available') || strcmp(lower(value), 'supported')
+        ret = get(self, 'getSupportedShutterSpeed');
       else
         ret = self.set('setShutterSpeed', num2str(value));
       end
@@ -288,6 +296,8 @@ classdef sonyalpha < handle
       if nargin < 2, value = ''; end
       if isempty(value)
         ret = get(self, 'getFNumber');
+      elseif strcmp(lower(value), 'available') || strcmp(lower(value), 'supported')
+        ret = get(self, 'getSupportedFNumber');
       else
         ret = self.set('setFNumber', num2str(value));
       end
@@ -312,6 +322,8 @@ classdef sonyalpha < handle
       if nargin < 2, value = ''; end
       if isempty(value)
         ret = get(self, 'getWhiteBalance');
+      elseif strcmp(lower(value), 'available') || strcmp(lower(value), 'supported')
+        ret = get(self, 'getSupportedWhiteBalance');
       else
         if ischar(value)
           json = [ '{"method": "setWhiteBalance","params": ["' value '", false, -1],"id": 1,"version": "1.0"}' ];
