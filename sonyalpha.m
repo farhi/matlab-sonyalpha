@@ -61,33 +61,38 @@ classdef sonyalpha < handle
     url           = 'http://192.168.122.1:8080/sony/camera';
     
     % settings, updated on getstatus
-    exposureMode  = '';
-    cameraStatus  = '';
-    selfTimer     = '';
-    zoomPosition  = '';
-    shootMode     = '';
-    exposureCompensation = ''; % in EV
-    fNumber       = '';
-    focusMode     = '';
-    isoSpeedRate  = '';
-    shutterSpeed  = '';
-    whiteBalance  = '';
+    exposureMode  = 'P';
+    cameraStatus  = 'IDLE';
+    selfTimer     = 0;
+    zoomPosition  = -1;
+    shootMode     = 'still';
+    exposureCompensation = 0; % in EV
+    fNumber       = '2.8';
+    focusMode     = 'AF-S';
+    isoSpeedRate  = 'AUTO';
+    shutterSpeed  = '1/60';
+    whiteBalance  = 'Auto WB';
     
-    status        = '';
-    version       = '';
-    updateTimer   = '';
+    status        = struct();
+    version       = '2.40';
+  end % properties
+  
+  properties (Access=private)
+    updateTimer   = ''; % a timer object for auto getstatus every 5 s.
     
     % continuous/timelapse modes
-    continuous_mode = 0;
-    timelapse_mode  = 0;
-    timelapse_clock = 0;
-    timelapse_interval = 0;
+    timelapse_clock = 0;    % clock when last shot
+    timelapse_interval = 0; % time between shots
 
   end % properties
   
   methods
     function self = sonyalpha(url)
       % sonyalpha: initialize the remote control for Sony Alpha Camera
+      %
+      %   s = sonyalpha;
+      %
+      % the default url is http://192.168.122.1:8080/sony/camera
       if nargin > 1
         self.url = url;
       end
@@ -175,20 +180,26 @@ classdef sonyalpha < handle
     end % start
     
     function ret = stop(self)
-      % stop: stop the camera shooting mode
+      % stop: stop the camera shooting.
+      % 
+      % start(s) must be used to be able to take pictures again.
       ret = self.get('stopRecMode');
-      self.continuous_mode = false;
-      self.timelapse_mode  = false;
+      self.timelapse_clock = 0;
     end % stop
     
     function url = urlread(self)
       % urlread: take a picture and return the distant URL (no upload)
+      %
       % must have used 'start' before (e.g. at init).
       url = char(self.get('actTakePicture'));
     end % urlread
     
-    function im = urlwrite(self, filename)
+    function [im,url] = urlwrite(self, filename)
       % urlread: take a picture, and download it as a local file
+      %
+      % [im, url] = urlwrite(s, filename)
+      %   write image into 'filename' and return the distant image URL.
+      %
       % must have used 'start' before (e.g. at init).
       
       if nargin < 2, filename = ''; end
@@ -222,9 +233,74 @@ classdef sonyalpha < handle
      
     end % imread
     
-    function h = image(self)
-      h = image(self.imread);
+    function [h, im, exif] = image(self)
+      % image: take a picture, and display it.
+      %
+      % [h, im, exif] = image(s)
+      %   also return image handle, image RGB matrix and EXIF data.
+      
+      [im, exif] = imread(self)
+      h = image(im);
     end % image
+    
+    function h = plot(self)
+      % plot: get a live-view image, display it, but does not store it.
+      %
+      % The response time is around 2s.
+      
+      % TODO:
+      % display pointer(s) for alignement (and keep them)
+      %
+      % we could set the ffmpeg as a background commands then monitor for the
+      % temporary file, and plot when it comes. 
+      %
+      % could also launch external viewer:
+      % gst-launch-1.0 souphttpsrc location=http://192.168.122.1:8080/liveview/liveviewstream ! sonyalphademux ! jpegparse ! jpegdec ! videoconvert ! autovideosink
+      
+      % start the LiveView mode and get a frame
+      filename = [ tempname '.jpg' ];
+      % get the livestream URL e.g. 
+      %   http://192.168.122.1:8080/liveview/liveviewstream
+      url = self.get('startLiveview');
+      cmd = [ 'ffmpeg  -ss 1 -i ' url ' -frames:v 1 ' filename ];
+      [ret, message] = system(cmd);
+      self.get('stopLiveView');
+      % read the image and display it. delete tmp file.
+      im  = imread(filename);
+      h   = image(im);
+      delete(filename);
+    end % plot
+    
+    % upper level continuous/timelapse modes
+    function continuous(self)
+      % continuous: take pictures continuously
+      %
+      % a second call will stop the shooting.
+      timelapse(self, 0);
+    end % continuous
+    
+    function timelapse(self, wait)
+      % timelapse: take pictures with current settings every 'wait' seconds
+      %
+      % timelapse(s, wait)
+      %   use 'wait' as interval between pictures (in seconds).
+      %
+      % a second call will stop the shooting.
+      if self.timelapse_clock
+        % stop after next capture
+        self.timelapse_clock = 0;
+        disp([ mfilename ': stop shooting' ])
+      else
+        if nargin < 2, wait=30; end
+        self.timelapse_interval = wait;
+        self.timelapse_clock    = clock;
+        if wait > 0
+          disp([ mfilename ': start shooting (timelapse every ' num2str(wait) ' [s])' ]);
+        else
+          disp([ mfilename ': start shooting (continuous)' ]);
+        end
+      end
+    end
     
     % Camera settings ----------------------------------------------------------
     function ret = iso(self, value)
@@ -355,33 +431,6 @@ classdef sonyalpha < handle
       end
     end % white
     
-    % upper level continuous/timelapse modes
-    function continuous(self)
-      % timelapse: take a picture continuously
-      if self.continuous_mode
-        % stop after next capture
-        self.continuous_mode = false;
-        disp([ mfilename ': stopping continuous shooting' ])
-      else
-        self.continuous_mode = true;
-        disp([ mfilename ': starting continuous shooting' ])
-      end
-    end % continuous
-    
-    function timelapse(self, wait)
-      % timelapse: take a picture with current settings every 'wait' seconds
-      if self.timelapse_mode
-        % stop after next capture
-        self.timelapse_mode = false;
-        disp([ mfilename ': stopping timelapse shooting' ])
-      else
-        self.timelapse_mode     = true;
-        self.timelapse_interval = wait;
-        self.timelapse_clock    = clock;
-      end
-    end
-    
-    
   end % methods
   
 end % sonyalpha class
@@ -428,16 +477,14 @@ function TimerCallback(src, evnt)
   if isvalid(self), self.getstatus; 
   else delete(src); return; end
   
-  % handle continuous shooting mode
+  % handle continuous shooting mode: do something when camera is IDLE
   if strcmpi(self.cameraStatus,'IDLE')
-    if self.continuous_mode
-      url = self.urlread;
-      disp([ mfilename ': [' datestr(now) '] continuous shooting ' url ]);
-    elseif self.timelapse_mode && etime(clock, self.timelapse_clock) > self.timelapse_interval
+    if self.timelapse_clock && etime(clock, self.timelapse_clock) > self.timelapse_interval
       self.timelapse_clock     = clock;
       url = self.urlread;
-      disp([ mfilename ': [' datestr(now) '] timelapse ' url ]);
+      disp([ mfilename ': [' datestr(now) '] image ' url ]);
     end
+  end
   
 end % TimerCallback
 

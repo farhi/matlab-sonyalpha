@@ -1,6 +1,8 @@
 # matlab-sonyalpha
 Control a Sony Alpha Camera
 
+![Image of A6000](https://github.com/farhi/matlab-starbook/blob/master/doc/A6000.png)
+
 SONYALPHA A class to control a Sony Alpha Camera (NEX, Alpha, ...) compatible
   with the Camera Remote API by Sony.
  
@@ -21,6 +23,9 @@ Then you can use the Methods:
 - white:              set/get the white balance
 - image:              take a shot and display it
 - imread:             take a shot and download the image (no display)
+- plot:               display a live-view image
+- continuous:         start continuous shooting
+- timelapse:          start time-lapse shooting
  
 Connecting the Camera
 ---------------------
