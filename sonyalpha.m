@@ -98,14 +98,16 @@ classdef sonyalpha < handle
       end
       
       self.version = self.get('getApplicationInfo');
+      if iscell(self.version), self.version = [ self.version{:} ]; end
       
       % init timer for regular updates, timelapse, etc
       self.updateTimer  = timer('TimerFcn', @TimerCallback, ...
-          'Period', 5.0, 'ExecutionMode', 'fixedDelay', 'UserData', self, ...
+          'Period', 5.0, 'ExecutionMode', 'fixedDelay', ...
           'Name', mfilename);
+      set(self.updateTimer, 'UserData', self);
 
       self.start;
-      disp([ mfilename ': [' datestr(now) '] Welcome to Sony Alpha ' char(self.version) ' at ' self.url ])
+      disp([ mfilename ': [' datestr(now) '] Welcome to Sony Alpha ' char(self.version) ' at ' char(self.url) ])
 
     end % sonyalpha
     
@@ -113,9 +115,7 @@ classdef sonyalpha < handle
     function status = getstatus(self)
       % getstatus: get the Camera status and all settings
       json = '{"method": "getEvent", "params": [false], "id": 1, "version": "1.2"}';
-      [ret, message] = curl(self.url, json);
-      message = loadjson(message);
-      message = message.result;
+      message = curl(self.url, json);
       status  = struct();
       status.unsorted ={};
       for index=1:numel(message)
@@ -176,7 +176,7 @@ classdef sonyalpha < handle
       % start: set the camera into shooting mode
       ret = self.get('startRecMode');
       self.getstatus;
-      start(self.updateTimer);
+      if strcmp(self.updateTimer.Running, 'off') start(self.updateTimer); end
     end % start
     
     function ret = stop(self)
@@ -190,8 +190,16 @@ classdef sonyalpha < handle
     function url = urlread(self)
       % urlread: take a picture and return the distant URL (no upload)
       %
-      % must have used 'start' before (e.g. at init).
-      url = char(self.get('actTakePicture'));
+      % Must have used 'start' before (e.g. at init).
+      % The resulting image is the 'postview' one, e.g. 2M pixels. The original
+      % image remains on the camera.
+      url = self.get('actTakePicture');
+      if iscellstr(url)
+        url = char(url);
+      else
+        self.start; % try to start the camera
+        disp([ mfilename ': camera is not ready.' ]);
+      end
     end % urlread
     
     function [im,url] = urlwrite(self, filename)
@@ -200,7 +208,9 @@ classdef sonyalpha < handle
       % [im, url] = urlwrite(s, filename)
       %   write image into 'filename' and return the distant image URL.
       %
-      % must have used 'start' before (e.g. at init).
+      % Must have used 'start' before (e.g. at init).
+      % The resulting image is the 'postview' one, e.g. 2M pixels. The original
+      % image remains on the camera.
       
       if nargin < 2, filename = ''; end
       
@@ -224,12 +234,16 @@ classdef sonyalpha < handle
       %
       % [im, exif] = imread(s)
       %   returns the EXIF data.
+      %
+      % Must have used 'start' before (e.g. at init).
+      % The resulting image is the 'postview' one, e.g. 2M pixels. The original
+      % image remains on the camera.
       filename = tempname;
       url  = self.urlwrite(filename);
       
       im   = imread(url); % local file
-      if nargout > 1, exif = imfinfo(file); end
-      delete(filename);
+      if nargout > 1, exif = imfinfo(url); end
+      delete(url);
      
     end % imread
     
@@ -238,8 +252,12 @@ classdef sonyalpha < handle
       %
       % [h, im, exif] = image(s)
       %   also return image handle, image RGB matrix and EXIF data.
+      %
+      % Must have used 'start' before (e.g. at init).
+      % The resulting image is the 'postview' one, e.g. 2M pixels. The original
+      % image remains on the camera.
       
-      [im, exif] = imread(self)
+      [im, exif] = imread(self);
       h = image(im);
     end % image
     
@@ -275,7 +293,7 @@ classdef sonyalpha < handle
     function continuous(self)
       % continuous: take pictures continuously
       %
-      % a second call will stop the shooting.
+      % A second call will stop the shooting.
       timelapse(self, 0);
     end % continuous
     
@@ -285,7 +303,7 @@ classdef sonyalpha < handle
       % timelapse(s, wait)
       %   use 'wait' as interval between pictures (in seconds).
       %
-      % a second call will stop the shooting.
+      % A second call will stop the shooting.
       if self.timelapse_clock
         % stop after next capture
         self.timelapse_clock = 0;
@@ -479,7 +497,7 @@ function TimerCallback(src, evnt)
   
   % handle continuous shooting mode: do something when camera is IDLE
   if strcmpi(self.cameraStatus,'IDLE')
-    if self.timelapse_clock && etime(clock, self.timelapse_clock) > self.timelapse_interval
+    if any(self.timelapse_clock) && etime(clock, self.timelapse_clock) > self.timelapse_interval
       self.timelapse_clock     = clock;
       url = self.urlread;
       disp([ mfilename ': [' datestr(now) '] image ' url ]);
