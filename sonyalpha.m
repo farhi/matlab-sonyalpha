@@ -19,10 +19,16 @@ classdef sonyalpha < handle
   %   timer:              set/get the self timer
   %   fnumber:            set/get the F/D aperture
   %   white:              set/get the white balance
+  %   exp:                set/get the exposure compensation
+  %   focus:              set/get the focus mode
   %
   %   urlread:            take a picture and return the distant URL (no download)
   %   imread:             take a picture and download the RGB image (no display)
   %   image:              take a picture and display it
+  %   plot:               show the live-view image (not stored)
+  %
+  %   continuous:         start/stop continuous shooting with current settings.
+  %   timelapse:          start/stop timelapse  shooting with current settings.
   %
   % Connecting the Camera
   % ---------------------
@@ -58,7 +64,7 @@ classdef sonyalpha < handle
   % (c) E. Farhi, GPL2, 2018.
 
   properties
-    url           = 'http://192.168.122.1:8080/sony/camera';
+    url           = 'http://192.168.122.1:8080';
     
     % settings, updated on getstatus
     exposureMode  = 'P';
@@ -74,6 +80,7 @@ classdef sonyalpha < handle
     whiteBalance  = 'Auto WB';
     
     status        = struct();
+    available     = struct();
     version       = '2.40';
   end % properties
   
@@ -98,25 +105,91 @@ classdef sonyalpha < handle
         self.url = url;
       end
       
-      self.version = self.get('getApplicationInfo');
+      self.version = self.api('getApplicationInfo');
       if iscell(self.version), self.version = [ self.version{:} ]; end
-      
+
+      for f = {'mode','iso','timer','fnumber','white','exp','shutter','focus'}
+        self.available.(f{1}) = feval(f{1}, self, 'available');
+        this = self.available.(f{1});
+        if strcmp(f{1}, 'exp')
+          self.available.(f{1}) = unique(round((min(this):max(this))/3));
+        elseif strcmp(f{1}, 'fnumber') && isempty(this)
+          self.available.(f{1}) = {'2.8' '3.5' '4.0' '4.5' '5.0' '5.6' '6.3' ...
+           '7.1' '8.0' '9.0' '10' '11' '13' '16' '20' '22' };
+        elseif strcmp(f{1}, 'shutter') && isempty(this)
+          self.available.(f{1}) = {'30"' '25"' '20"' '15"' '10"' '5"' '4"' ...
+          '3"' '2"' '1"' '1/10' '1/30' '1/60' '1/125' '1/250' '1/400' '1/1000' };
+        end
+      end
+       
       % init timer for regular updates, timelapse, etc
       self.updateTimer  = timer('TimerFcn', @TimerCallback, ...
           'Period', 5.0, 'ExecutionMode', 'fixedDelay', ...
           'Name', mfilename);
       set(self.updateTimer, 'UserData', self);
-
+      
+      % get available settings
       self.start;
-      disp([ mfilename ': [' datestr(now) '] Welcome to Sony Alpha ' char(self.version) ' at ' char(self.url) ])
+      
+      
+      disp([ mfilename ': [' datestr(now) '] Welcome to Sony Alpha ' char(self.version) ' at ' char(self.url) ]);
+      plot_window(self);
 
     end % sonyalpha
+    
+    % main communication method (low-level)
+    function message = curl(self, post, target)
+      % prepare curl command
+      if ismac,      precmd = 'DYLD_LIBRARY_PATH= ;';
+      elseif isunix, precmd = 'LD_LIBRARY_PATH= ; '; 
+      else           precmd=''; end
+      
+      if nargin < 3, target = 'camera'; end
+      url = fullfile(self.url, 'sony', target);
+      
+      cmd = [ 'curl -d ''' post ''' ' url ];
+      
+      % evaluate command
+      [ret, message]=system([ precmd  cmd ]);
+      
+      if ret % error
+        disp(cmd)
+        disp([ mfilename ': Connection failed: ' url])
+        error(message);
+      end
+      
+      % decode JSON output into struct
+      try
+        if ~isempty(message)
+          message = strrep(message, '\/','/');
+          message = loadjson(message); % We use JSONlab reader which is more robust
+        end
+      catch
+        disp(cmd)
+        message
+        error([ mfilename ': Invalid JSON result. Perhaps the connection failed ?' ])
+      end
+
+      if isstruct(message) && isfield(message, 'result') && ischar(message.result)
+        message.result = strrep(message.result', '\/','/');
+      end
+      if isstruct(message) && numel(fieldnames(message)) == 2
+        if  isfield(message, 'result')
+          message = message.result;
+        elseif isfield(message, 'error')
+          message = message.error;
+        end
+      end
+      if iscell(message) && numel(message) == 1
+        message = message{1};
+      end
+    end % curl
     
     % INFO stuff
     function status = getstatus(self)
       % getstatus: get the Camera status and all settings
       json = '{"method": "getEvent", "params": [false], "id": 1, "version": "1.2"}';
-      message = curl(self.url, json);
+      message = curl(self, json);
       status  = struct();
       status.unsorted ={};
       for index=1:numel(message)
@@ -154,28 +227,32 @@ classdef sonyalpha < handle
       end
     end % getstatus
     
-    % generic get for most API commands ------------------------------------
-    function ret = get(self, method)
-      % get('method'):  get the given API method call (no argument)
-      json = [ '{"method": "' method '","params": [],"id": 1,"version": "1.0"}' ];
-      ret  = curl(self.url, json);
-    end % get
+    % generic API call ---------------------------------------------------------
     
-    function ret = set(self, method, value)
-      % set('method', param): get the given API method call (with argument)
-      if isnumeric(value),  value = num2str(value);
-      elseif ischar(value), value = [ '"' value '"' ];
-      elseif islogical(value)
-        if value, value = 'true'; else value = 'false'; end
+    function ret = api(self, method, value, service)
+      % api('method'):        call the given API method call (without argument)
+      % api('method', param): call the given API method call (with argument)
+      % api(..., service):    call the given API method call, for the API service.
+      %    Default is service='camera'. Other choice is 'avContent'.
+      if nargin < 4, service='camera'; end
+      if nargin < 3 || isempty(value)
+        json = [ '{"method": "' method '","params": [],"id": 1,"version": "1.0"}' ];
+      else
+        if isnumeric(value),  value = num2str(value);
+        elseif ischar(value), value = [ '"' value '"' ];
+        elseif islogical(value)
+          if value, value = 'true'; else value = 'false'; end
+        end
+        json = [ '{"method": "' method '","params": [' value '],"id": 1,"version": "1.0"}' ];
       end
-      json = [ '{"method": "' method '","params": [' value '],"id": 1,"version": "1.0"}' ];
-      ret  = curl(self.url, json);
-    end % set
+      
+      ret  = curl(self, json, service);
+    end % api
     
     % Camera Shooting ----------------------------------------------------------
     function ret = start(self)
       % start: set the camera into shooting mode
-      ret = self.get('startRecMode');
+      ret = self.api('startRecMode');
       self.getstatus;
       if strcmp(self.updateTimer.Running, 'off') start(self.updateTimer); end
     end % start
@@ -184,7 +261,7 @@ classdef sonyalpha < handle
       % stop: stop the camera shooting.
       % 
       % start(s) must be used to be able to take pictures again.
-      ret = self.get('stopRecMode');
+      ret = self.api('stopRecMode');
       self.timelapse_clock = 0;
     end % stop
     
@@ -194,7 +271,7 @@ classdef sonyalpha < handle
       % Must have used 'start' before (e.g. at init).
       % The resulting image is the 'postview' one, e.g. 2M pixels. The original
       % image remains on the camera.
-      url = self.get('actTakePicture');
+      url = self.api('actTakePicture');
       if iscellstr(url)
         url = char(url);
       else
@@ -239,6 +316,7 @@ classdef sonyalpha < handle
       %  getContentList to get list of files on camera
       %  parse content list to get file URI's
       %  deleteContent to delete each file
+      curl(self, 'getCameraFunction', 'avContent');
     end % urldelete
     
     function [im, exif] = imread(self)
@@ -291,10 +369,10 @@ classdef sonyalpha < handle
       filename = [ tempname '.jpg' ];
       % get the livestream URL e.g. 
       %   http://192.168.122.1:8080/liveview/liveviewstream
-      url = self.get('startLiveview');
+      url = self.api('startLiveview');
       cmd = [ 'ffmpeg  -ss 1 -i ' url ' -frames:v 1 ' filename ];
       [ret, message] = system(cmd);
-      self.get('stopLiveView');
+      self.api('stopLiveView');
       % read the image and display it. delete tmp file.
       im  = imread(filename);
       h   = image(im);
@@ -351,11 +429,11 @@ classdef sonyalpha < handle
       % The ISO value can be e.g. AUTO 100 200 400 800 1600 3200 6400 12800 25600 
       if nargin < 2, value = ''; end
       if isempty(value)
-        ret = get(self, 'getIsoSpeedRate');
+        ret = api(self, 'getIsoSpeedRate');
       elseif strcmp(lower(value), 'available') || strcmp(lower(value), 'supported')
-        ret = get(self, 'getSupportedIsoSpeedRate');
+        ret = api(self, 'getSupportedIsoSpeedRate');
       else
-        ret = self.set('setIsoSpeedRate', num2str(value));
+        ret = self.api('setIsoSpeedRate', num2str(value));
       end
     end % iso
     
@@ -368,7 +446,7 @@ classdef sonyalpha < handle
       %   'Intelligent Auto', or 'P', 'A', 'S', 'M'
       if nargin < 2, value = ''; end
       if isempty(value)
-        ret = get(self, 'getExposureMode');
+        ret = api(self, 'getExposureMode');
         switch ret
         case 'Program Auto'; ret = 'P';
         case 'Aperture';     ret = 'A';
@@ -376,7 +454,7 @@ classdef sonyalpha < handle
         case 'Manual';       ret = 'M';
         end
       elseif strcmp(lower(value), 'available') || strcmp(lower(value), 'supported')
-        ret = get(self, 'getSupportedExposureMode');
+        ret = api(self, 'getSupportedExposureMode');
       else
         switch upper(value(1))
         case 'P'; value = 'Program Auto';
@@ -384,7 +462,7 @@ classdef sonyalpha < handle
         case 'S'; value = 'Shutter';
         case 'M'; value = 'Manual';
         end
-        ret = self.set('setExposureMode', value);
+        ret = self.api('setExposureMode', value);
       end
     end % mode
     
@@ -396,11 +474,11 @@ classdef sonyalpha < handle
       % The self Timer value can be e.g. 0, 2 or 10 (numeric)
       if nargin < 2, value = ''; end
       if isempty(value)
-        ret = get(self, 'getSelfTimer');
+        ret = api(self, 'getSelfTimer');
       elseif strcmp(lower(value), 'available') || strcmp(lower(value), 'supported')
-        ret = get(self, 'getSupportedSelfTimer');
+        ret = api(self, 'getSupportedSelfTimer');
       else
-        ret = self.set('setSelfTimer', num2str(value));
+        ret = self.api('setSelfTimer', num2str(value));
       end
     end % timer
     
@@ -413,15 +491,15 @@ classdef sonyalpha < handle
       %   where the " symbol stands for seconds.
       if nargin < 2, value = ''; end
       if isempty(value)
-        ret = get(self, 'getShutterSpeed');
+        ret = api(self, 'getShutterSpeed');
       elseif strcmp(lower(value), 'available') || strcmp(lower(value), 'supported')
-        ret = get(self, 'getSupportedShutterSpeed');
+        ret = api(self, 'getSupportedShutterSpeed');
       else
         if isnumeric(value)
           if   value >= 1, value = sprintf('%d"',  ceil(value));
           else             value = sprintf('1/%d', ceil(1/value)); end
         end
-        ret = self.set('setShutterSpeed', num2str(value));
+        ret = self.api('setShutterSpeed', num2str(value));
       end
     end % shutter
     
@@ -433,11 +511,11 @@ classdef sonyalpha < handle
       % The F/D number value can be e.g. '1.4','2.0','2.8','4.0','5.6'
       if nargin < 2, value = ''; end
       if isempty(value)
-        ret = get(self, 'getFNumber');
+        ret = api(self, 'getFNumber');
       elseif strcmp(lower(value), 'available') || strcmp(lower(value), 'supported')
-        ret = get(self, 'getSupportedFNumber');
+        ret = api(self, 'getSupportedFNumber');
       else
-        ret = self.set('setFNumber', num2str(value));
+        ret = self.api('setFNumber', num2str(value));
       end
     end % fnumber
     
@@ -460,40 +538,50 @@ classdef sonyalpha < handle
       % or a Temperature (numeric for 'Color Temperature' mode) in 2500-9900 K
       if nargin < 2, value = ''; end
       if isempty(value)
-        ret = get(self, 'getWhiteBalance');
+        ret = api(self, 'getWhiteBalance');
       elseif strcmp(lower(value), 'available') || strcmp(lower(value), 'supported')
-        ret = get(self, 'getSupportedWhiteBalance');
+        ret = api(self, 'getSupportedWhiteBalance');
       else
         if ischar(value)
           json = [ '{"method": "setWhiteBalance","params": ["' value '", false, -1],"id": 1,"version": "1.0"}' ];
-          ret = curl(self.url, json);
+          ret = curl(self, json);
         elseif isnumeric(value)
           value = round(value/100)*100;
           json = [ '{"method": "setWhiteBalance","params": ["Color Temperature", true, ' num2str(value) '],"id": 1,"version": "1.0"}' ];
-          ret = curl(self.url, json);
+          ret = curl(self, json);
         end
       end
     end % white
     
-    function exp(self)
+    function ret=exp(self, value)
+      % exp(s):      get the Exposure Compensation
+      % exp(s, val): set the Exposure Compensation as a string
+      % exp(s, 'supported') return supported Exposure Compensations (strings)
+      %
+      % The Exposure Compensation value can be e.g. -9 to 9 in [1/3 EV] units.
       if nargin < 2, value = ''; end
       if isempty(value)
-        ret = get(self, 'getExposureMode');
+        ret = api(self, 'getExposureCompensation');
       elseif strcmp(lower(value), 'available') || strcmp(lower(value), 'supported')
-        ret = get(self, 'getSupportedExposureMode');
+        ret = api(self, 'getSupportedExposureCompensation');
       else
-        ret = self.set('setExposureMode', num2str(value));
+        ret = self.api('setExposureCompensation', value);
       end
     end
     
-    function focus(self)
+    function ret=focus(self, value)
+      % focus(s):      get the focus mode 
+      % focus(s, val): set the focus mode as a string
+      % focus(s, 'supported') return supported focus modes (strings)
+      %
+      % The F/D number value can be e.g. 'AF-S','AF-C','DMF','MF'
       if nargin < 2, value = ''; end
       if isempty(value)
-        ret = get(self, 'getFocusMode');
+        ret = api(self, 'getFocusMode');
       elseif strcmp(lower(value), 'available') || strcmp(lower(value), 'supported')
-        ret = get(self, 'getSupportedFocusMode');
+        ret = api(self, 'getSupportedFocusMode');
       else
-        ret = self.set('setFocusMode', num2str(value));
+        ret = self.api('setFocusMode', num2str(value));
       end
     end
     
@@ -503,45 +591,7 @@ end % sonyalpha class
 
 % internal communication done with curl ----------------------------------------
 
-function message = curl(url, post)
-  % prepare curl command
-  if ismac,      precmd = 'DYLD_LIBRARY_PATH= ;';
-  elseif isunix, precmd = 'LD_LIBRARY_PATH= ; '; 
-  else           precmd=''; end
-  
-  cmd = [ 'curl -d ''' post ''' ' url ];
-  
-  % evaluate command
-  [ret, message]=system([ precmd  cmd ]);
-  
-  if ret % error
-    disp(cmd)
-    disp([ mfilename ': Connection failed: ' url])
-    error(message);
-  end
-  
-  % decode JSON output into struct
-  try
-    message = loadjson(message); % We use JSONlab reader which is more robust
-  catch
-    disp(cmd)
-    error([ mfilename ': Invalid JSON result. Perhaps the connection failed ?' ])
-  end
 
-  if isstruct(message) && isfield(message, 'result') && ischar(message.result)
-    message.result = strrep(message.result', '\/','/');
-  end
-  if isstruct(message) && numel(fieldnames(message)) == 2
-    if  isfield(message, 'result')
-      message = message.result;
-    elseif isfield(message, 'error')
-      message = message.error;
-    end
-  end
-  if iscell(message) && numel(message) == 1
-    message = message{1};
-  end
-end % curl
 
 % main timer to auto update the camera status and handle e.g. time-lapse
 % ----------------------------------------------------------------------
@@ -552,6 +602,12 @@ function TimerCallback(src, evnt)
   if isvalid(self), self.getstatus; 
   else delete(src); return; end
   
+  % update figure Name (if any)
+  h = findall(0, 'Tag', 'SonyAlpha');
+  if ~isempty(h)
+    set(h, 'Name', [ 'SonyAlpha: ' self.cameraStatus ' ' self.url ]);
+  end
+  
   % handle continuous shooting mode: do something when camera is IDLE
   if strcmpi(self.cameraStatus,'IDLE')
     if any(self.timelapse_clock) && etime(clock, self.timelapse_clock) > self.timelapse_interval
@@ -560,6 +616,8 @@ function TimerCallback(src, evnt)
       disp([ mfilename ': [' datestr(now) '] image ' url ]);
     end
   end
+  
+  
   
 end % TimerCallback
 
@@ -588,50 +646,58 @@ function plot_window(self)
       'Accelerator','w', 'Separator','on');
       
     m0 = uimenu(h, 'Label', 'View');
-    labs = { 'Show grid',          @image, ...
-             'Add Pointer...',     @continuous };
+    labs = { 'Show grid',          'grid on'; ...
+             'Brighter',  ''; ...
+             'Darker',  ''; ...
+             'Add Pointer...',     '' };
     for index1 = 1:size(labs, 1)
       method    = labs{index1,2};
-      m1        = uimenu(m0, 'Label', labs{index1,1}, ...
-        'Callback', [ method(self) ]);
+      m1        = uimenu(m0, 'Label', labs{index1,1});
+      %  'Callback', [ method(self) ]);
     end
     
     % Settings menu
     m0 = uimenu(h, 'Label', 'Settings');
       
-    labs = { 'Mode (Program)',          @mode; ...
-             'Aperture (F/D)',          @fnumber, ...
-             'Shutter Speed',           @shutter, ...
-             'ISO',                     @iso, ...
-             'Exp. Compensation (EV)',  @exp, ...
-             'White Balance',           @white, ...
-             'Focus',                   @focus, ...
-             'Timer',                   @timer };
+    labs = { 'Mode (Program)',          'mode'; ...
+             'Aperture (F/D)',          'fnumber'; ...
+             'Shutter Speed',           'shutter'; ...
+             'ISO',                     'iso'; ...
+             'Exp. Compensation (EV)',  'exp'; ...
+             'White Balance',           'white'; ...
+             'Focus',                   'focus'; ...
+             'Timer',                   'timer' };
     for index1 = 1:size(labs, 1)
       m1        = uimenu(m0, 'Label', labs{index1,1});
       % get list of available choices
       method    = labs{index1,2};
-      available = feval(method, self, 'available');
+      available = self.available.(method);
       if isnumeric(available)
         available = num2cell(available);
       end
       for index2 = 1:numel(available)
-        m2 = uimenu(m1, 'Label', num2str(available{index2}), ...
-          'Callback', [ method(self, num2str(available{index2})) ]);
+        if isstruct(available{index2})
+          available{index2} = getfield(available{index2},'whiteBalanceMode');
+        end
+        m2 = uimenu(m1, 'Label', num2str(available{index2}));
+      %    'Callback', [ method(self, num2str(available{index2})) ]);
       end
     end
   
     m0 = uimenu(h, 'Label', 'Shoot');
-    labs = { 'Single',                    @image, ...
-             'Continuous Start/Stop',     @continuous, ...
+    labs = { 'Single',                    @image; ...
+             'Continuous Start/Stop',     @continuous; ...
              'Time-Lapse Start/Stop...',  @timelapse };
     for index1 = 1:size(labs, 1)
       method    = labs{index1,2};
-      m1        = uimenu(m0, 'Label', labs{index1,1}, ...
-        'Callback', [ method(self) ]);
+      m1        = uimenu(m0, 'Label', labs{index1,1});
+     %   'Callback', [ method(self) ]);
     end
     
     % TODO: add pointers
+    
+    % plot the first image
+    plot(self);
   
   else
     if numel(h) > 1, delete(h(2:end)); h=h(1); end
