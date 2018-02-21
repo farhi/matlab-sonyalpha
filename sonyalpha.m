@@ -83,6 +83,7 @@ classdef sonyalpha < handle
     % continuous/timelapse modes
     timelapse_clock = 0;    % clock when last shot
     timelapse_interval = 0; % time between shots
+    figure = [];
 
   end % properties
   
@@ -229,6 +230,17 @@ classdef sonyalpha < handle
       im   = urlwrite(url, filename);
     end % urlwrite
     
+    function urldelete(self, filename)
+      % delete files from the camera using the following sequence of calls:
+      % 
+      %  setCameraFunction to "Contents Transfer"
+      %  getSourceList to get storage location
+      %  getContentCount to get count of files
+      %  getContentList to get list of files on camera
+      %  parse content list to get file URI's
+      %  deleteContent to delete each file
+    end % urldelete
+    
     function [im, exif] = imread(self)
       % imread: take a picture, and read it as an RGB matrix.
       %
@@ -309,7 +321,17 @@ classdef sonyalpha < handle
         self.timelapse_clock = 0;
         disp([ mfilename ': stop shooting' ])
       else
-        if nargin < 2, wait=30; end
+        if nargin < 2
+          prompt = {'Enter Time-Lapse Periodicity [s]'};
+          name = 'SonyAlpha: Time-Lapse';
+          options.Resize='on';
+          options.WindowStyle='normal';
+          options.Interpreter='tex';
+          answer=inputdlg(prompt,name, 1, {'30'}, options);
+          if isempty(answer), return; end
+          wait=str2double(answer{1});
+          if ~isfinite(wait), return; end
+        end
         self.timelapse_interval = wait;
         self.timelapse_clock    = clock;
         if wait > 0
@@ -395,6 +417,10 @@ classdef sonyalpha < handle
       elseif strcmp(lower(value), 'available') || strcmp(lower(value), 'supported')
         ret = get(self, 'getSupportedShutterSpeed');
       else
+        if isnumeric(value)
+          if   value >= 1, value = sprintf('%d"',  ceil(value));
+          else             value = sprintf('1/%d', ceil(1/value)); end
+        end
         ret = self.set('setShutterSpeed', num2str(value));
       end
     end % shutter
@@ -449,6 +475,28 @@ classdef sonyalpha < handle
       end
     end % white
     
+    function exp(self)
+      if nargin < 2, value = ''; end
+      if isempty(value)
+        ret = get(self, 'getExposureMode');
+      elseif strcmp(lower(value), 'available') || strcmp(lower(value), 'supported')
+        ret = get(self, 'getSupportedExposureMode');
+      else
+        ret = self.set('setExposureMode', num2str(value));
+      end
+    end
+    
+    function focus(self)
+      if nargin < 2, value = ''; end
+      if isempty(value)
+        ret = get(self, 'getFocusMode');
+      elseif strcmp(lower(value), 'available') || strcmp(lower(value), 'supported')
+        ret = get(self, 'getSupportedFocusMode');
+      else
+        ret = self.set('setFocusMode', num2str(value));
+      end
+    end
+    
   end % methods
   
 end % sonyalpha class
@@ -468,11 +516,17 @@ function message = curl(url, post)
   
   if ret % error
     disp(cmd)
+    disp([ mfilename ': Connection failed: ' url])
     error(message);
   end
   
   % decode JSON output into struct
-  message = loadjson(message); % We use JSONlab reader which is more robust
+  try
+    message = loadjson(message); % We use JSONlab reader which is more robust
+  catch
+    disp(cmd)
+    error([ mfilename ': Invalid JSON result. Perhaps the connection failed ?' ])
+  end
 
   if isstruct(message) && isfield(message, 'result') && ischar(message.result)
     message.result = strrep(message.result', '\/','/');
@@ -488,6 +542,9 @@ function message = curl(url, post)
     message = message{1};
   end
 end % curl
+
+% main timer to auto update the camera status and handle e.g. time-lapse
+% ----------------------------------------------------------------------
 
 function TimerCallback(src, evnt)
   % TimerCallback: update from timer event
@@ -505,4 +562,83 @@ function TimerCallback(src, evnt)
   end
   
 end % TimerCallback
+
+% simple interface build: show current live-view/last image, and
+% camera set-up menu.
+% -----------------------------------------------------------------------
+
+function plot_window(self)
+
+  h = findall(0, 'Tag', 'SonyAlpha');
+  if isempty(h)
+    % build the plot/menu window
+    h = figure('Tag', 'SonyAlpha', ...
+      'UserData', self, 'MenuBar','none');
+      
+    % File menu
+    m = uimenu(h, 'Label', 'File');
+    uimenu(m, 'Label', 'Save',        ...
+      'Callback', 'filemenufcn(gcbf,''FileSave'')','Accelerator','s');
+    uimenu(m, 'Label', 'Save As...',        ...
+      'Callback', 'filemenufcn(gcbf,''FileSaveAs'')');
+    uimenu(m, 'Label', 'Print',        ...
+      'Callback', 'printdlg(gcbf)');
+    uimenu(m, 'Label', 'Close',        ...
+      'Callback', 'filemenufcn(gcbf,''FileClose'')', ...
+      'Accelerator','w', 'Separator','on');
+      
+    m0 = uimenu(h, 'Label', 'View');
+    labs = { 'Show grid',          @image, ...
+             'Add Pointer...',     @continuous };
+    for index1 = 1:size(labs, 1)
+      method    = labs{index1,2};
+      m1        = uimenu(m0, 'Label', labs{index1,1}, ...
+        'Callback', [ method(self) ]);
+    end
+    
+    % Settings menu
+    m0 = uimenu(h, 'Label', 'Settings');
+      
+    labs = { 'Mode (Program)',          @mode; ...
+             'Aperture (F/D)',          @fnumber, ...
+             'Shutter Speed',           @shutter, ...
+             'ISO',                     @iso, ...
+             'Exp. Compensation (EV)',  @exp, ...
+             'White Balance',           @white, ...
+             'Focus',                   @focus, ...
+             'Timer',                   @timer };
+    for index1 = 1:size(labs, 1)
+      m1        = uimenu(m0, 'Label', labs{index1,1});
+      % get list of available choices
+      method    = labs{index1,2};
+      available = feval(method, self, 'available');
+      if isnumeric(available)
+        available = num2cell(available);
+      end
+      for index2 = 1:numel(available)
+        m2 = uimenu(m1, 'Label', num2str(available{index2}), ...
+          'Callback', [ method(self, num2str(available{index2})) ]);
+      end
+    end
+  
+    m0 = uimenu(h, 'Label', 'Shoot');
+    labs = { 'Single',                    @image, ...
+             'Continuous Start/Stop',     @continuous, ...
+             'Time-Lapse Start/Stop...',  @timelapse };
+    for index1 = 1:size(labs, 1)
+      method    = labs{index1,2};
+      m1        = uimenu(m0, 'Label', labs{index1,1}, ...
+        'Callback', [ method(self) ]);
+    end
+    
+    % TODO: add pointers
+  
+  else
+    if numel(h) > 1, delete(h(2:end)); h=h(1); end
+    set(0, 'CurrentFigure',h);
+  end
+  self.figure = h;
+  set(h, 'HandleVisibility','on', 'NextPlot','add');
+  set(h, 'Name', [ 'SonyAlpha: ' self.cameraStatus ' ' self.url ]);
+end % plot_window
 
