@@ -710,6 +710,8 @@ function plot_window(self)
       'Accelerator','o', 'UserData',{ 'zoom', self, 'out'});
   
     m0 = uimenu(h, 'Label', 'Shoot');
+    uimenu(m0, 'Label', 'Update Live-View', 'Accelerator','u', ...
+      'Callback', @MenuCallback, 'UserData',{ 'plot', self });
     labs = { 'Single',                    'image'; ...
              'Continuous Start/Stop',     'continuous'; ...
              'Time-Lapse Start/Stop...',  'timelapse' };
@@ -731,7 +733,7 @@ function plot_window(self)
 end % plot_window
 
 function MenuCallback(src, evnt)
-
+  % menu actions, as stored in the uimenu UserData
 
   arg = get(src, 'UserData');
   
