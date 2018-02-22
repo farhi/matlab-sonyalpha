@@ -528,6 +528,7 @@ classdef sonyalpha < handle
         ret = api(self, 'getShutterSpeed');
       elseif strcmp(lower(value), 'available') || strcmp(lower(value), 'supported')
         ret = api(self, 'getSupportedShutterSpeed');
+        ret = strrep(ret, '"', '\"');
       else
         if isnumeric(value)
           if   value >= 1, value = sprintf('%d\\"', ceil(value));
