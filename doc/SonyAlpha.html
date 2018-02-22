@@ -1,0 +1,490 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+  <head>
+    <meta http-equiv="content-type" content="text/html;
+      charset=windows-1252">
+  </head>
+  <body>
+    <meta http-equiv="content-type" content="text/html;
+      charset=windows-1252">
+    <h1 style="box-sizing: border-box; font-size: 2em; margin-top: 0px
+      !important; margin-right: 0px; margin-bottom: 16px; margin-left:
+      0px; font-weight: 600; line-height: 1.25; padding-bottom: 0.3em;
+      border-bottom: 1px solid rgb(234, 236, 239); color: rgb(36, 41,
+      46); font-family: -apple-system, BlinkMacSystemFont, &quot;Segoe
+      UI&quot;, Helvetica, Arial, sans-serif, &quot;Apple Color
+      Emoji&quot;, &quot;Segoe UI Emoji&quot;, &quot;Segoe UI
+      Symbol&quot;; font-style: normal; font-variant-ligatures: normal;
+      font-variant-caps: normal; letter-spacing: normal; orphans: 2;
+      text-align: start; text-indent: 0px; text-transform: none;
+      white-space: normal; widows: 2; word-spacing: 0px;
+      -webkit-text-stroke-width: 0px; text-decoration-style: initial;
+      text-decoration-color: initial;">matlab-sonyalpha</h1>
+    <p style="box-sizing: border-box; margin-top: 0px; margin-bottom:
+      16px; color: rgb(36, 41, 46); font-family: -apple-system,
+      BlinkMacSystemFont, &quot;Segoe UI&quot;, Helvetica, Arial,
+      sans-serif, &quot;Apple Color Emoji&quot;, &quot;Segoe UI
+      Emoji&quot;, &quot;Segoe UI Symbol&quot;; font-size: 16px;
+      font-style: normal; font-variant-ligatures: normal;
+      font-variant-caps: normal; font-weight: 400; letter-spacing:
+      normal; orphans: 2; text-align: start; text-indent: 0px;
+      text-transform: none; white-space: normal; widows: 2;
+      word-spacing: 0px; -webkit-text-stroke-width: 0px;
+      text-decoration-style: initial; text-decoration-color: initial;">Control
+
+      a Sony Alpha Camera</p>
+    <div align="center"><a
+href="https://github.com/farhi/matlab-sonyalpha/blob/master/doc/A6000.png"
+        target="_blank" style="box-sizing: border-box; background-color:
+        transparent; color: rgb(3, 102, 214); text-decoration: none;"><img
+          src="A6000.png" alt="Image of A6000" style="box-sizing:
+          content-box; border-style: none; max-width: 100%;
+          background-color: rgb(255, 255, 255);" border="0" height="340"
+          width="300"></a></div>
+    <p style="box-sizing: border-box; margin-top: 0px; margin-bottom:
+      16px; color: rgb(36, 41, 46); font-family: -apple-system,
+      BlinkMacSystemFont, &quot;Segoe UI&quot;, Helvetica, Arial,
+      sans-serif, &quot;Apple Color Emoji&quot;, &quot;Segoe UI
+      Emoji&quot;, &quot;Segoe UI Symbol&quot;; font-size: 16px;
+      font-style: normal; font-variant-ligatures: normal;
+      font-variant-caps: normal; font-weight: 400; letter-spacing:
+      normal; orphans: 2; text-align: start; text-indent: 0px;
+      text-transform: none; white-space: normal; widows: 2;
+      word-spacing: 0px; -webkit-text-stroke-width: 0px;
+      text-decoration-style: initial; text-decoration-color: initial;">SONYALPHA:
+
+      A class to control a Sony Alpha Camera (NEX, Alpha, ...)
+      compatible with the Camera Remote API by Sony.</p>
+    <h2 style="box-sizing: border-box; margin-top: 24px; margin-bottom:
+      16px; font-size: 1.5em; font-weight: 600; line-height: 1.25;
+      padding-bottom: 0.3em; border-bottom: 1px solid rgb(234, 236,
+      239); color: rgb(36, 41, 46); font-family: -apple-system,
+      BlinkMacSystemFont, &quot;Segoe UI&quot;, Helvetica, Arial,
+      sans-serif, &quot;Apple Color Emoji&quot;, &quot;Segoe UI
+      Emoji&quot;, &quot;Segoe UI Symbol&quot;; font-style: normal;
+      font-variant-ligatures: normal; font-variant-caps: normal;
+      letter-spacing: normal; orphans: 2; text-align: start;
+      text-indent: 0px; text-transform: none; white-space: normal;
+      widows: 2; word-spacing: 0px; -webkit-text-stroke-width: 0px;
+      text-decoration-style: initial; text-decoration-color: initial;"><a
+        href="https://github.com/farhi/matlab-sonyalpha#usage"
+        aria-hidden="true" class="anchor" id="user-content-usage"
+        style="box-sizing: border-box; background-color: transparent;
+        color: rgb(3, 102, 214); text-decoration: none; float: left;
+        padding-right: 4px; margin-left: -20px; line-height: 1;"><svg
+          aria-hidden="true" class="octicon octicon-link" height="16"
+          version="1.1" viewBox="0 0 16 16" width="16"><path
+            fill-rule="evenodd" d="M4 9h1v1H4c-1.5 0-3-1.69-3-3.5S2.55 3
+            4 3h4c1.45 0 3 1.69 3 3.5 0 1.41-.91 2.72-2
+            3.25V8.59c.58-.45 1-1.27 1-2.09C10 5.22 8.98 4 8 4H4c-.98
+            0-2 1.22-2 2.5S3 9 4 9zm9-3h-1v1h1c1 0 2 1.22 2 2.5S13.98 12
+            13 12H9c-.98 0-2-1.22-2-2.5 0-.83.42-1.64
+            1-2.09V6.25c-1.09.53-2 1.84-2 3.25C6 11.31 7.55 13 9
+            13h4c1.45 0 3-1.69 3-3.5S14.5 6 13 6z"></path></svg></a>Usage</h2>
+    <div class="highlight highlight-source-matlab" style="box-sizing:
+      border-box; margin-bottom: 16px; color: rgb(36, 41, 46);
+      font-family: -apple-system, BlinkMacSystemFont, &quot;Segoe
+      UI&quot;, Helvetica, Arial, sans-serif, &quot;Apple Color
+      Emoji&quot;, &quot;Segoe UI Emoji&quot;, &quot;Segoe UI
+      Symbol&quot;; font-size: 16px; font-style: normal;
+      font-variant-ligatures: normal; font-variant-caps: normal;
+      font-weight: 400; letter-spacing: normal; orphans: 2; text-align:
+      start; text-indent: 0px; text-transform: none; white-space:
+      normal; widows: 2; word-spacing: 0px; -webkit-text-stroke-width:
+      0px; text-decoration-style: initial; text-decoration-color:
+      initial;">
+      <pre style="box-sizing: border-box; font-family: SFMono-Regular, Consolas, &quot;Liberation Mono&quot;, Menlo, Courier, monospace; font-size: 13.6px; margin-top: 0px; margin-bottom: 0px; word-wrap: normal; padding: 16px; overflow: auto; line-height: 1.45; background-color: rgb(246, 248, 250); border-radius: 3px; word-break: normal;">&gt;&gt; camera = sonyalpha;</pre>
+    </div>
+    <p style="box-sizing: border-box; margin-top: 0px; margin-bottom:
+      16px; color: rgb(36, 41, 46); font-family: -apple-system,
+      BlinkMacSystemFont, &quot;Segoe UI&quot;, Helvetica, Arial,
+      sans-serif, &quot;Apple Color Emoji&quot;, &quot;Segoe UI
+      Emoji&quot;, &quot;Segoe UI Symbol&quot;; font-size: 16px;
+      font-style: normal; font-variant-ligatures: normal;
+      font-variant-caps: normal; font-weight: 400; letter-spacing:
+      normal; orphans: 2; text-align: start; text-indent: 0px;
+      text-transform: none; white-space: normal; widows: 2;
+      word-spacing: 0px; -webkit-text-stroke-width: 0px;
+      text-decoration-style: initial; text-decoration-color: initial;">Then
+
+      you can use the Methods:</p>
+    <ul style="box-sizing: border-box; padding-left: 2em; margin-top:
+      0px; margin-bottom: 16px; color: rgb(36, 41, 46); font-family:
+      -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;,
+      Helvetica, Arial, sans-serif, &quot;Apple Color Emoji&quot;,
+      &quot;Segoe UI Emoji&quot;, &quot;Segoe UI Symbol&quot;;
+      font-size: 16px; font-style: normal; font-variant-ligatures:
+      normal; font-variant-caps: normal; font-weight: 400;
+      letter-spacing: normal; orphans: 2; text-align: start;
+      text-indent: 0px; text-transform: none; white-space: normal;
+      widows: 2; word-spacing: 0px; -webkit-text-stroke-width: 0px;
+      text-decoration-style: initial; text-decoration-color: initial;">
+      <li style="box-sizing: border-box;">getstatus: get the camera
+        status</li>
+      <li style="box-sizing: border-box; margin-top: 0.25em;">start: set
+        the camera ready for shooting pictures</li>
+      <li style="box-sizing: border-box; margin-top: 0.25em;">stop: stop
+        the shooting mode</li>
+      <li style="box-sizing: border-box; margin-top: 0.25em;">iso:
+        set/get ISO setting</li>
+      <li style="box-sizing: border-box; margin-top: 0.25em;">shutter:
+        set/get shutter speed setting</li>
+      <li style="box-sizing: border-box; margin-top: 0.25em;">mode:
+        set/get the PASM mode</li>
+      <li style="box-sizing: border-box; margin-top: 0.25em;">timer:
+        set/get the self timer</li>
+      <li style="box-sizing: border-box; margin-top: 0.25em;">fnumber:
+        set/get the F/D aperture</li>
+      <li style="box-sizing: border-box; margin-top: 0.25em;">white:
+        set/get the white balance</li>
+      <li style="box-sizing: border-box; margin-top: 0.25em;">exp:
+        set/get the exposure compensation</li>
+      <li style="box-sizing: border-box; margin-top: 0.25em;">focus:
+        set/get the focus mode</li>
+      <li style="box-sizing: border-box; margin-top: 0.25em;">zoom: zoom
+        in or out</li>
+      <li style="box-sizing: border-box; margin-top: 0.25em;">urlread:
+        take a picture and return the distant URL (no download)</li>
+      <li style="box-sizing: border-box; margin-top: 0.25em;">imread:
+        take a picture and download the RGB image (no display)</li>
+      <li style="box-sizing: border-box; margin-top: 0.25em;">image:
+        take a picture and display it</li>
+      <li style="box-sizing: border-box; margin-top: 0.25em;">plot: show
+        the live-view image (not stored)</li>
+      <li style="box-sizing: border-box; margin-top: 0.25em;">continuous:
+
+        start/stop continuous shooting with current settings.</li>
+      <li style="box-sizing: border-box; margin-top: 0.25em;">timelapse:
+        start/stop timelapse shooting with current settings.</li>
+    </ul>
+    <p style="box-sizing: border-box; margin-top: 0px; margin-bottom:
+      16px; color: rgb(36, 41, 46); font-family: -apple-system,
+      BlinkMacSystemFont, &quot;Segoe UI&quot;, Helvetica, Arial,
+      sans-serif, &quot;Apple Color Emoji&quot;, &quot;Segoe UI
+      Emoji&quot;, &quot;Segoe UI Symbol&quot;; font-size: 16px;
+      font-style: normal; font-variant-ligatures: normal;
+      font-variant-caps: normal; font-weight: 400; letter-spacing:
+      normal; orphans: 2; text-align: start; text-indent: 0px;
+      text-transform: none; white-space: normal; widows: 2;
+      word-spacing: 0px; -webkit-text-stroke-width: 0px;
+      text-decoration-style: initial; text-decoration-color: initial;">as
+
+      well as other methods that you can list with:</p>
+    <div class="highlight highlight-source-matlab" style="box-sizing:
+      border-box; margin-bottom: 16px; color: rgb(36, 41, 46);
+      font-family: -apple-system, BlinkMacSystemFont, &quot;Segoe
+      UI&quot;, Helvetica, Arial, sans-serif, &quot;Apple Color
+      Emoji&quot;, &quot;Segoe UI Emoji&quot;, &quot;Segoe UI
+      Symbol&quot;; font-size: 16px; font-style: normal;
+      font-variant-ligatures: normal; font-variant-caps: normal;
+      font-weight: 400; letter-spacing: normal; orphans: 2; text-align:
+      start; text-indent: 0px; text-transform: none; white-space:
+      normal; widows: 2; word-spacing: 0px; -webkit-text-stroke-width:
+      0px; text-decoration-style: initial; text-decoration-color:
+      initial;">
+      <pre style="box-sizing: border-box; font-family: SFMono-Regular, Consolas, &quot;Liberation Mono&quot;, Menlo, Courier, monospace; font-size: 13.6px; margin-top: 0px; margin-bottom: 0px; word-wrap: normal; padding: 16px; overflow: auto; line-height: 1.45; background-color: rgb(246, 248, 250); border-radius: 3px; word-break: normal;">&gt;&gt; methods(camera)</pre>
+    </div>
+    <p style="box-sizing: border-box; margin-top: 0px; margin-bottom:
+      16px; color: rgb(36, 41, 46); font-family: -apple-system,
+      BlinkMacSystemFont, &quot;Segoe UI&quot;, Helvetica, Arial,
+      sans-serif, &quot;Apple Color Emoji&quot;, &quot;Segoe UI
+      Emoji&quot;, &quot;Segoe UI Symbol&quot;; font-size: 16px;
+      font-style: normal; font-variant-ligatures: normal;
+      font-variant-caps: normal; font-weight: 400; letter-spacing:
+      normal; orphans: 2; text-align: start; text-indent: 0px;
+      text-transform: none; white-space: normal; widows: 2;
+      word-spacing: 0px; -webkit-text-stroke-width: 0px;
+      text-decoration-style: initial; text-decoration-color: initial;">The
+
+      LiveView image, that is shown with the "plot" method, is<span>&nbsp;</span><em
+        style="box-sizing: border-box;">NOT</em><span>&nbsp;</span>updated
+
+      continuously, and is rather slow (e.g. 2s).</p>
+    <h2 style="box-sizing: border-box; margin-top: 24px; margin-bottom:
+      16px; font-size: 1.5em; font-weight: 600; line-height: 1.25;
+      padding-bottom: 0.3em; border-bottom: 1px solid rgb(234, 236,
+      239); color: rgb(36, 41, 46); font-family: -apple-system,
+      BlinkMacSystemFont, &quot;Segoe UI&quot;, Helvetica, Arial,
+      sans-serif, &quot;Apple Color Emoji&quot;, &quot;Segoe UI
+      Emoji&quot;, &quot;Segoe UI Symbol&quot;; font-style: normal;
+      font-variant-ligatures: normal; font-variant-caps: normal;
+      letter-spacing: normal; orphans: 2; text-align: start;
+      text-indent: 0px; text-transform: none; white-space: normal;
+      widows: 2; word-spacing: 0px; -webkit-text-stroke-width: 0px;
+      text-decoration-style: initial; text-decoration-color: initial;"><a
+href="https://github.com/farhi/matlab-sonyalpha#connecting-the-camera"
+        aria-hidden="true" class="anchor"
+        id="user-content-connecting-the-camera" style="box-sizing:
+        border-box; background-color: transparent; color: rgb(3, 102,
+        214); text-decoration: none; float: left; padding-right: 4px;
+        margin-left: -20px; line-height: 1;"><svg aria-hidden="true"
+          class="octicon octicon-link" height="16" version="1.1"
+          viewBox="0 0 16 16" width="16"><path fill-rule="evenodd" d="M4
+            9h1v1H4c-1.5 0-3-1.69-3-3.5S2.55 3 4 3h4c1.45 0 3 1.69 3 3.5
+            0 1.41-.91 2.72-2 3.25V8.59c.58-.45 1-1.27 1-2.09C10 5.22
+            8.98 4 8 4H4c-.98 0-2 1.22-2 2.5S3 9 4 9zm9-3h-1v1h1c1 0 2
+            1.22 2 2.5S13.98 12 13 12H9c-.98 0-2-1.22-2-2.5
+            0-.83.42-1.64 1-2.09V6.25c-1.09.53-2 1.84-2 3.25C6 11.31
+            7.55 13 9 13h4c1.45 0 3-1.69 3-3.5S14.5 6 13 6z"></path></svg></a>Connecting
+
+      the Camera</h2>
+    <p style="box-sizing: border-box; margin-top: 0px; margin-bottom:
+      16px; color: rgb(36, 41, 46); font-family: -apple-system,
+      BlinkMacSystemFont, &quot;Segoe UI&quot;, Helvetica, Arial,
+      sans-serif, &quot;Apple Color Emoji&quot;, &quot;Segoe UI
+      Emoji&quot;, &quot;Segoe UI Symbol&quot;; font-size: 16px;
+      font-style: normal; font-variant-ligatures: normal;
+      font-variant-caps: normal; font-weight: 400; letter-spacing:
+      normal; orphans: 2; text-align: start; text-indent: 0px;
+      text-transform: none; white-space: normal; widows: 2;
+      word-spacing: 0px; -webkit-text-stroke-width: 0px;
+      text-decoration-style: initial; text-decoration-color: initial;">Start
+
+      your camera and use its Remote Control App (e.g. Play Memories
+      App) from the Camera settings. This starts the JSON REST HTTP
+      server, used to control the camera. The Network SSID is shown on
+      the Camera screen. Connect from your PC on that network. The usual
+      associated IP is then 192.168.122.1 (port 8080)</p>
+    <p style="box-sizing: border-box; margin-top: 0px; margin-bottom:
+      16px; color: rgb(36, 41, 46); font-family: -apple-system,
+      BlinkMacSystemFont, &quot;Segoe UI&quot;, Helvetica, Arial,
+      sans-serif, &quot;Apple Color Emoji&quot;, &quot;Segoe UI
+      Emoji&quot;, &quot;Segoe UI Symbol&quot;; font-size: 16px;
+      font-style: normal; font-variant-ligatures: normal;
+      font-variant-caps: normal; font-weight: 400; letter-spacing:
+      normal; orphans: 2; text-align: start; text-indent: 0px;
+      text-transform: none; white-space: normal; widows: 2;
+      word-spacing: 0px; -webkit-text-stroke-width: 0px;
+      text-decoration-style: initial; text-decoration-color: initial;">The
+
+      connection must be a dedicated ad-hoc, e.g. can<span>&nbsp;</span><em
+        style="box-sizing: border-box;">NOT</em><span>&nbsp;</span>use
+      an intermediate router. If you are already connected to the
+      Internet, you have to drop your current connection, or use an
+      additional Wifi adapter (e.g. USB-Wifi).</p>
+    <h2 style="box-sizing: border-box; margin-top: 24px; margin-bottom:
+      16px; font-size: 1.5em; font-weight: 600; line-height: 1.25;
+      padding-bottom: 0.3em; border-bottom: 1px solid rgb(234, 236,
+      239); color: rgb(36, 41, 46); font-family: -apple-system,
+      BlinkMacSystemFont, &quot;Segoe UI&quot;, Helvetica, Arial,
+      sans-serif, &quot;Apple Color Emoji&quot;, &quot;Segoe UI
+      Emoji&quot;, &quot;Segoe UI Symbol&quot;; font-style: normal;
+      font-variant-ligatures: normal; font-variant-caps: normal;
+      letter-spacing: normal; orphans: 2; text-align: start;
+      text-indent: 0px; text-transform: none; white-space: normal;
+      widows: 2; word-spacing: 0px; -webkit-text-stroke-width: 0px;
+      text-decoration-style: initial; text-decoration-color: initial;"><a
+href="https://github.com/farhi/matlab-sonyalpha#using-the-plot-window"
+        aria-hidden="true" class="anchor"
+        id="user-content-using-the-plot-window" style="box-sizing:
+        border-box; background-color: transparent; color: rgb(3, 102,
+        214); text-decoration: none; float: left; padding-right: 4px;
+        margin-left: -20px; line-height: 1;"><svg aria-hidden="true"
+          class="octicon octicon-link" height="16" version="1.1"
+          viewBox="0 0 16 16" width="16"><path fill-rule="evenodd" d="M4
+            9h1v1H4c-1.5 0-3-1.69-3-3.5S2.55 3 4 3h4c1.45 0 3 1.69 3 3.5
+            0 1.41-.91 2.72-2 3.25V8.59c.58-.45 1-1.27 1-2.09C10 5.22
+            8.98 4 8 4H4c-.98 0-2 1.22-2 2.5S3 9 4 9zm9-3h-1v1h1c1 0 2
+            1.22 2 2.5S13.98 12 13 12H9c-.98 0-2-1.22-2-2.5
+            0-.83.42-1.64 1-2.09V6.25c-1.09.53-2 1.84-2 3.25C6 11.31
+            7.55 13 9 13h4c1.45 0 3-1.69 3-3.5S14.5 6 13 6z"></path></svg></a>Using
+
+      the Plot Window</h2>
+    <div align="center"><a
+href="https://github.com/farhi/matlab-sonyalpha/blob/master/doc/SonyAlpha_image.png"
+        target="_blank" style="box-sizing: border-box; background-color:
+        transparent; color: rgb(3, 102, 214); text-decoration: none;"><img
+          src="SonyAlpha_image.png" alt="Image of SonyAlpha"
+          style="box-sizing: content-box; border-style: none; max-width:
+          100%; background-color: rgb(255, 255, 255);" border="0"
+          height="473" width="560"></a></div>
+    <p style="box-sizing: border-box; margin-top: 0px; margin-bottom:
+      16px; color: rgb(36, 41, 46); font-family: -apple-system,
+      BlinkMacSystemFont, &quot;Segoe UI&quot;, Helvetica, Arial,
+      sans-serif, &quot;Apple Color Emoji&quot;, &quot;Segoe UI
+      Emoji&quot;, &quot;Segoe UI Symbol&quot;; font-size: 16px;
+      font-style: normal; font-variant-ligatures: normal;
+      font-variant-caps: normal; font-weight: 400; letter-spacing:
+      normal; orphans: 2; text-align: start; text-indent: 0px;
+      text-transform: none; white-space: normal; widows: 2;
+      word-spacing: 0px; -webkit-text-stroke-width: 0px;
+      text-decoration-style: initial; text-decoration-color: initial;"><br>
+      The Plot window is shown when shooting stil images or updating the
+      LiveView. It contains the File, View, Settings and Shoot menus.</p>
+    <p style="box-sizing: border-box; margin-top: 0px; margin-bottom:
+      16px; color: rgb(36, 41, 46); font-family: -apple-system,
+      BlinkMacSystemFont, &quot;Segoe UI&quot;, Helvetica, Arial,
+      sans-serif, &quot;Apple Color Emoji&quot;, &quot;Segoe UI
+      Emoji&quot;, &quot;Segoe UI Symbol&quot;; font-size: 16px;
+      font-style: normal; font-variant-ligatures: normal;
+      font-variant-caps: normal; font-weight: 400; letter-spacing:
+      normal; orphans: 2; text-align: start; text-indent: 0px;
+      text-transform: none; white-space: normal; widows: 2;
+      word-spacing: 0px; -webkit-text-stroke-width: 0px;
+      text-decoration-style: initial; text-decoration-color: initial;">The
+
+      <b>View</b> menu allows to add Pointers and Marks on top of the
+      current image. These can be used for e.g. alignment.</p>
+    <p style="box-sizing: border-box; margin-top: 0px; margin-bottom:
+      16px; color: rgb(36, 41, 46); font-family: -apple-system,
+      BlinkMacSystemFont, &quot;Segoe UI&quot;, Helvetica, Arial,
+      sans-serif, &quot;Apple Color Emoji&quot;, &quot;Segoe UI
+      Emoji&quot;, &quot;Segoe UI Symbol&quot;; font-size: 16px;
+      font-style: normal; font-variant-ligatures: normal;
+      font-variant-caps: normal; font-weight: 400; letter-spacing:
+      normal; orphans: 2; text-align: start; text-indent: 0px;
+      text-transform: none; white-space: normal; widows: 2;
+      word-spacing: 0px; -webkit-text-stroke-width: 0px;
+      text-decoration-style: initial; text-decoration-color: initial;">The
+
+      <b>Settings</b> menu allows to change the most important camera
+      settings, including the zoom level (when available).</p>
+    <p style="box-sizing: border-box; margin-top: 0px; margin-bottom:
+      16px; color: rgb(36, 41, 46); font-family: -apple-system,
+      BlinkMacSystemFont, &quot;Segoe UI&quot;, Helvetica, Arial,
+      sans-serif, &quot;Apple Color Emoji&quot;, &quot;Segoe UI
+      Emoji&quot;, &quot;Segoe UI Symbol&quot;; font-size: 16px;
+      font-style: normal; font-variant-ligatures: normal;
+      font-variant-caps: normal; font-weight: 400; letter-spacing:
+      normal; orphans: 2; text-align: start; text-indent: 0px;
+      text-transform: none; white-space: normal; widows: 2;
+      word-spacing: 0px; -webkit-text-stroke-width: 0px;
+      text-decoration-style: initial; text-decoration-color: initial;">The
+
+      <b>Shoot</b> menu allows to take a single picture, update the live
+      view (lower resolution), as well as start a continuous or
+      timelapse shooting. To stop the continuous/timelapse session,
+      select the Shoot item again.</p>
+    <h2 style="box-sizing: border-box; margin-top: 24px; margin-bottom:
+      16px; font-size: 1.5em; font-weight: 600; line-height: 1.25;
+      padding-bottom: 0.3em; border-bottom: 1px solid rgb(234, 236,
+      239); color: rgb(36, 41, 46); font-family: -apple-system,
+      BlinkMacSystemFont, &quot;Segoe UI&quot;, Helvetica, Arial,
+      sans-serif, &quot;Apple Color Emoji&quot;, &quot;Segoe UI
+      Emoji&quot;, &quot;Segoe UI Symbol&quot;; font-style: normal;
+      font-variant-ligatures: normal; font-variant-caps: normal;
+      letter-spacing: normal; orphans: 2; text-align: start;
+      text-indent: 0px; text-transform: none; white-space: normal;
+      widows: 2; word-spacing: 0px; -webkit-text-stroke-width: 0px;
+      text-decoration-style: initial; text-decoration-color: initial;"><a
+href="https://github.com/farhi/matlab-sonyalpha#requirementsinstallation"
+        aria-hidden="true" class="anchor"
+        id="user-content-requirementsinstallation" style="box-sizing:
+        border-box; background-color: transparent; color: rgb(3, 102,
+        214); text-decoration: none; float: left; padding-right: 4px;
+        margin-left: -20px; line-height: 1;"><svg aria-hidden="true"
+          class="octicon octicon-link" height="16" version="1.1"
+          viewBox="0 0 16 16" width="16"><path fill-rule="evenodd" d="M4
+            9h1v1H4c-1.5 0-3-1.69-3-3.5S2.55 3 4 3h4c1.45 0 3 1.69 3 3.5
+            0 1.41-.91 2.72-2 3.25V8.59c.58-.45 1-1.27 1-2.09C10 5.22
+            8.98 4 8 4H4c-.98 0-2 1.22-2 2.5S3 9 4 9zm9-3h-1v1h1c1 0 2
+            1.22 2 2.5S13.98 12 13 12H9c-.98 0-2-1.22-2-2.5
+            0-.83.42-1.64 1-2.09V6.25c-1.09.53-2 1.84-2 3.25C6 11.31
+            7.55 13 9 13h4c1.45 0 3-1.69 3-3.5S14.5 6 13 6z"></path></svg></a>Requirements/Installation</h2>
+    <ul style="box-sizing: border-box; padding-left: 2em; margin-top:
+      0px; margin-bottom: 16px; color: rgb(36, 41, 46); font-family:
+      -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;,
+      Helvetica, Arial, sans-serif, &quot;Apple Color Emoji&quot;,
+      &quot;Segoe UI Emoji&quot;, &quot;Segoe UI Symbol&quot;;
+      font-size: 16px; font-style: normal; font-variant-ligatures:
+      normal; font-variant-caps: normal; font-weight: 400;
+      letter-spacing: normal; orphans: 2; text-align: start;
+      text-indent: 0px; text-transform: none; white-space: normal;
+      widows: 2; word-spacing: 0px; -webkit-text-stroke-width: 0px;
+      text-decoration-style: initial; text-decoration-color: initial;">
+      <li style="box-sizing: border-box;">Matlab, no external toolbox</li>
+      <li style="box-sizing: border-box; margin-top: 0.25em;">A wifi
+        connection</li>
+      <li style="box-sizing: border-box; margin-top: 0.25em;">A Sony
+        Camera</li>
+      <li style="box-sizing: border-box; margin-top: 0.25em;">curl: Get
+        it at<span>&nbsp;</span><a href="https://curl.haxx.se/"
+          rel="nofollow" style="box-sizing: border-box;
+          background-color: transparent; color: rgb(3, 102, 214);
+          text-decoration: none;">https://curl.haxx.se/</a></li>
+      <li style="box-sizing: border-box; margin-top: 0.25em;">ffmpeg
+        (for liveview): Get it at<span>&nbsp;</span><a
+          href="https://www.ffmpeg.org/" rel="nofollow"
+          style="box-sizing: border-box; background-color: transparent;
+          color: rgb(3, 102, 214); text-decoration: none;">https://www.ffmpeg.org/</a></li>
+    </ul>
+    <p style="box-sizing: border-box; margin-top: 0px; margin-bottom:
+      16px; color: rgb(36, 41, 46); font-family: -apple-system,
+      BlinkMacSystemFont, &quot;Segoe UI&quot;, Helvetica, Arial,
+      sans-serif, &quot;Apple Color Emoji&quot;, &quot;Segoe UI
+      Emoji&quot;, &quot;Segoe UI Symbol&quot;; font-size: 16px;
+      font-style: normal; font-variant-ligatures: normal;
+      font-variant-caps: normal; font-weight: 400; letter-spacing:
+      normal; orphans: 2; text-align: start; text-indent: 0px;
+      text-transform: none; white-space: normal; widows: 2;
+      word-spacing: 0px; -webkit-text-stroke-width: 0px;
+      text-decoration-style: initial; text-decoration-color: initial;">Just
+
+      copy the files and go into the directory. Then type commands
+      above, once the camera is configured (see above).</p>
+    <h2 style="box-sizing: border-box; margin-top: 24px; margin-bottom:
+      16px; font-size: 1.5em; font-weight: 600; line-height: 1.25;
+      padding-bottom: 0.3em; border-bottom: 1px solid rgb(234, 236,
+      239); color: rgb(36, 41, 46); font-family: -apple-system,
+      BlinkMacSystemFont, &quot;Segoe UI&quot;, Helvetica, Arial,
+      sans-serif, &quot;Apple Color Emoji&quot;, &quot;Segoe UI
+      Emoji&quot;, &quot;Segoe UI Symbol&quot;; font-style: normal;
+      font-variant-ligatures: normal; font-variant-caps: normal;
+      letter-spacing: normal; orphans: 2; text-align: start;
+      text-indent: 0px; text-transform: none; white-space: normal;
+      widows: 2; word-spacing: 0px; -webkit-text-stroke-width: 0px;
+      text-decoration-style: initial; text-decoration-color: initial;"><a
+        href="https://github.com/farhi/matlab-sonyalpha#credits"
+        aria-hidden="true" class="anchor" id="user-content-credits"
+        style="box-sizing: border-box; background-color: transparent;
+        color: rgb(3, 102, 214); text-decoration: none; float: left;
+        padding-right: 4px; margin-left: -20px; line-height: 1;"><svg
+          aria-hidden="true" class="octicon octicon-link" height="16"
+          version="1.1" viewBox="0 0 16 16" width="16"><path
+            fill-rule="evenodd" d="M4 9h1v1H4c-1.5 0-3-1.69-3-3.5S2.55 3
+            4 3h4c1.45 0 3 1.69 3 3.5 0 1.41-.91 2.72-2
+            3.25V8.59c.58-.45 1-1.27 1-2.09C10 5.22 8.98 4 8 4H4c-.98
+            0-2 1.22-2 2.5S3 9 4 9zm9-3h-1v1h1c1 0 2 1.22 2 2.5S13.98 12
+            13 12H9c-.98 0-2-1.22-2-2.5 0-.83.42-1.64
+            1-2.09V6.25c-1.09.53-2 1.84-2 3.25C6 11.31 7.55 13 9
+            13h4c1.45 0 3-1.69 3-3.5S14.5 6 13 6z"></path></svg></a>Credits</h2>
+    <ul style="box-sizing: border-box; padding-left: 2em; margin-top:
+      0px; margin-bottom: 16px; color: rgb(36, 41, 46); font-family:
+      -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;,
+      Helvetica, Arial, sans-serif, &quot;Apple Color Emoji&quot;,
+      &quot;Segoe UI Emoji&quot;, &quot;Segoe UI Symbol&quot;;
+      font-size: 16px; font-style: normal; font-variant-ligatures:
+      normal; font-variant-caps: normal; font-weight: 400;
+      letter-spacing: normal; orphans: 2; text-align: start;
+      text-indent: 0px; text-transform: none; white-space: normal;
+      widows: 2; word-spacing: 0px; -webkit-text-stroke-width: 0px;
+      text-decoration-style: initial; text-decoration-color: initial;">
+      <li style="box-sizing: border-box;"><a
+          href="https://github.com/micolous/gst-plugins-sonyalpha"
+          style="box-sizing: border-box; background-color: transparent;
+          color: rgb(3, 102, 214); text-decoration: none;">https://github.com/micolous/gst-plugins-sonyalpha</a></li>
+      <li style="box-sizing: border-box; margin-top: 0.25em;"><a
+          href="https://github.com/Bloodevil/sony_camera_api"
+          style="box-sizing: border-box; background-color: transparent;
+          color: rgb(3, 102, 214); text-decoration: none;">https://github.com/Bloodevil/sony_camera_api</a></li>
+      <li style="box-sizing: border-box; margin-top: 0.25em;"><a
+          href="https://developer.sony.com/develop/cameras/#overview-content"
+          rel="nofollow" style="box-sizing: border-box;
+          background-color: transparent; color: rgb(3, 102, 214);
+          text-decoration: none;">https://developer.sony.com/develop/cameras/#overview-content</a></li>
+    </ul>
+    <p style="box-sizing: border-box; margin-top: 0px; margin-bottom:
+      0px !important; color: rgb(36, 41, 46); font-family:
+      -apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;,
+      Helvetica, Arial, sans-serif, &quot;Apple Color Emoji&quot;,
+      &quot;Segoe UI Emoji&quot;, &quot;Segoe UI Symbol&quot;;
+      font-size: 16px; font-style: normal; font-variant-ligatures:
+      normal; font-variant-caps: normal; font-weight: 400;
+      letter-spacing: normal; orphans: 2; text-align: start;
+      text-indent: 0px; text-transform: none; white-space: normal;
+      widows: 2; word-spacing: 0px; -webkit-text-stroke-width: 0px;
+      text-decoration-style: initial; text-decoration-color: initial;">(c)
+
+      E. Farhi, GPL2, 2018.</p>
+  </body>
+</html>
