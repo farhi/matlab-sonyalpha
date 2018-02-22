@@ -21,6 +21,7 @@ classdef sonyalpha < handle
   %   white:              set/get the white balance
   %   exp:                set/get the exposure compensation
   %   focus:              set/get the focus mode
+  %   zoom:               zoom in or out
   %
   %   urlread:            take a picture and return the distant URL (no download)
   %   imread:             take a picture and download the RGB image (no display)
@@ -212,19 +213,19 @@ classdef sonyalpha < handle
       
       % store that information into properties
       self.status       = status;
-      try
-        self.exposureMode = status.exposureMode.currentExposureMode;
-        self.cameraStatus = status.cameraStatus;
-        self.selfTimer    = status.selfTimer.currentSelfTimer;
-        self.zoomPosition = status.zoomInformation.zoomPosition;
-        self.shootMode    = status.shootMode.currentShootMode;
-        self.exposureCompensation = status.exposureCompensation.currentExposureCompensation/3;
-        self.fNumber      = status.fNumber.currentFNumber;
-        self.focusMode    = status.focusMode.currentFocusMode;
-        self.isoSpeedRate = status.isoSpeedRate.currentIsoSpeedRate;
-        self.shutterSpeed = status.shutterSpeed.currentShutterSpeed;
-        self.whiteBalance = status.whiteBalance.currentWhiteBalanceMode;
-      end
+      try; self.exposureMode = status.exposureMode.currentExposureMode; end
+      try; self.cameraStatus = status.cameraStatus; end
+      try; self.selfTimer    = status.selfTimer.currentSelfTimer; end
+      try; self.zoomPosition = status.zoomInformation.zoomPosition; end
+      try; self.shootMode    = status.shootMode.currentShootMode; end
+      try; self.exposureCompensation = ...
+             status.exposureCompensation.currentExposureCompensation/3; end
+      try; self.fNumber      = status.fNumber.currentFNumber; end
+      try; self.focusMode    = status.focusMode.currentFocusMode; end
+      try; self.isoSpeedRate = status.isoSpeedRate.currentIsoSpeedRate; end
+      try; self.shutterSpeed = status.shutterSpeed.currentShutterSpeed; end
+      try; self.whiteBalance = status.whiteBalance.currentWhiteBalanceMode; end
+
     end % getstatus
     
     % generic API call ---------------------------------------------------------
@@ -567,7 +568,7 @@ classdef sonyalpha < handle
       else
         ret = self.api('setExposureCompensation', value);
       end
-    end
+    end % exp
     
     function ret=focus(self, value)
       % focus(s):      get the focus mode 
@@ -583,7 +584,21 @@ classdef sonyalpha < handle
       else
         ret = self.api('setFocusMode', num2str(value));
       end
-    end
+    end % focus
+    
+    function ret = zoom(self, d)
+      % zoom(s):                get the zoom value
+      % zoom(s, 'in' or 'out'): zoom in or out
+      if nargin < 2
+        ret = self.zoomPosition;
+      elseif any(strcmpi(d, {'in','out'}))
+        json = [ '{"method": "setZoomSetting","params": ["zoom", "On:Clear Image Zoom"],"id": 1,"version": "1.0"}' ];
+        ret = curl(self, json);
+        json = [ '{"method": "actZoom","params": ["dir", "1shot"],"id": 1,"version": "1.0"}' ];
+        ret = curl(self, json);
+      else ret = [];
+      end
+    end % zoom
     
   end % methods
   
