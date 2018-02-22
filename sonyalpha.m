@@ -91,7 +91,10 @@ classdef sonyalpha < handle
     % continuous/timelapse modes
     timelapse_clock = 0;    % clock when last shot
     timelapse_interval = 0; % time between shots
-    figure = [];
+    figure   = [];
+    x        = []; % a list of coordinates where to add pointers
+    y        = [];
+    show_lines = false;
 
   end % properties
   
@@ -350,7 +353,10 @@ classdef sonyalpha < handle
       % image remains on the camera.
       
       [im, exif] = imread(self);
-      h = image(im);
+      fig        = plot_window(self);
+      h          = image(im);
+      set(fig, 'HandleVisibility','off', 'NextPlot','new');
+      plot_pointers('','',self);
     end % image
     
     function h = plot(self)
@@ -366,12 +372,11 @@ classdef sonyalpha < handle
       %
       % could also launch external viewer:
       % gst-launch-1.0 souphttpsrc location=http://192.168.122.1:8080/liveview/liveviewstream ! sonyalphademux ! jpegparse ! jpegdec ! videoconvert ! autovideosink
+      %
+      % or: https://github.com/erik-smit/sony-camera-api/blob/master/liveView.py
       
       % check for SonyAlpha viewer
-      h = findall(0, 'Tag', 'SonyAlpha');
-      if isempty(h)
-        plot_window(self);
-      end
+      
       % start the LiveView mode and get a frame
       filename = [ tempname '.jpg' ];
       % get the livestream URL e.g. 
@@ -382,9 +387,31 @@ classdef sonyalpha < handle
       self.api('stopLiveView');
       % read the image and display it. delete tmp file.
       im  = imread(filename);
+      fig = plot_window(self);
       h   = image(im);
+      set(fig, 'HandleVisibility','off', 'NextPlot','new');
       delete(filename);
+      plot_pointers('','',self);
+      
     end % plot
+    
+    function about(self)
+      % about: display camera settings
+      
+      % display settings
+      items = {'exposureMode','cameraStatus','selfTimer','zoomPosition', ...
+        'shootMode','exposureCompensation','fNumber','focusMode', ...
+        'isoSpeedRate','shutterSpeed','whiteBalance' };
+      c = { };
+      for f=items
+        val = num2str(self.(f{1}));
+        c{end+1} = sprintf('%s = %s', f{1}, val);
+      end
+      c{end+1} = 'SonyAlpha for Matlab';
+      c{end+1} = '(c) E. Farhi <https://github.com/farhi/matlab-sonyalpha>';
+      helpdlg(c, 'SonyAlpha: Settings');
+      
+    end
     
     % upper level continuous/timelapse modes
     function continuous(self)
@@ -623,12 +650,6 @@ function TimerCallback(src, evnt)
   if isvalid(self), self.getstatus; 
   else delete(src); return; end
   
-  % update figure Name (if any)
-  h = findall(0, 'Tag', 'SonyAlpha');
-  if ~isempty(h)
-    set(h, 'Name', [ 'SonyAlpha: ' self.cameraStatus ' ' self.url ]);
-  end
-  
   % handle continuous shooting mode: do something when camera is IDLE
   if strcmpi(self.cameraStatus,'IDLE')
     if any(self.timelapse_clock) && etime(clock, self.timelapse_clock) > self.timelapse_interval
@@ -646,7 +667,7 @@ end % TimerCallback
 % camera set-up menu.
 % -----------------------------------------------------------------------
 
-function plot_window(self)
+function h = plot_window(self)
 
   h = findall(0, 'Tag', 'SonyAlpha');
   if isempty(h)
@@ -667,15 +688,14 @@ function plot_window(self)
       'Accelerator','w', 'Separator','on');
       
     m0 = uimenu(h, 'Label', 'View');
-    labs = { 'Toggle grid',          'grid'; ...
-             'Brighter',  ''; ...
-             'Darker',  ''; ...
-             'Add Pointer...',     '' };
-    for index1 = 1:size(labs, 1)
-      method    = labs{index1,2};
-      m1        = uimenu(m0, 'Label', labs{index1,1});
-      %  'Callback', [ method(self) ]);
-    end
+    uimenu(m0, 'Label', 'Add pointer', ...
+      'Callback', {@plot_pointers, self, 'new'});
+    uimenu(m0, 'Label', 'Clear pointers', ...
+      'Callback', {@plot_pointers, self, 'clear'});
+    uimenu(m0, 'Label', 'Show/Hide Lines', ...
+      'Callback', {@plot_pointers, self, 'toggle'});
+    uimenu(m0, 'Label', 'About Sony Alpha', ...
+      'Callback', {@MenuCallback, 'about', self }, 'Separator','on');
     
     % Settings menu
     m0 = uimenu(h, 'Label', 'Settings');
@@ -701,27 +721,27 @@ function plot_window(self)
           available{index2} = getfield(available{index2},'whiteBalanceMode');
         end
         m2 = uimenu(m1, 'Label', num2str(available{index2}), ...
-          'Callback', @MenuCallback, 'UserData',{ method, self, available{index2}});
+          'Callback', {@MenuCallback, method, self, available{index2} });
       end
     end
-    uimenu(m0, 'Label', 'Zoom in',  'Callback', @MenuCallback, ...
-      'Accelerator','i', 'Separator','on', 'UserData',{ 'zoom', self, 'in'});
-    uimenu(m0, 'Label', 'Zoom out', 'Callback', @MenuCallback, ...
-      'Accelerator','o', 'UserData',{ 'zoom', self, 'out'});
+    uimenu(m0, 'Label', 'Zoom in',  ...
+      'Callback', {@MenuCallback, 'zoom', self, 'in'},...
+      'Accelerator','i', 'Separator','on');
+    uimenu(m0, 'Label', 'Zoom out', ...
+      'Callback', {@MenuCallback,'zoom', self, 'out'}, ...
+      'Accelerator','o');
   
     m0 = uimenu(h, 'Label', 'Shoot');
     uimenu(m0, 'Label', 'Update Live-View', 'Accelerator','u', ...
-      'Callback', @MenuCallback, 'UserData',{ 'plot', self });
+      'Callback', {@MenuCallback, 'plot', self });
     labs = { 'Single',                    'image'; ...
              'Continuous Start/Stop',     'continuous'; ...
              'Time-Lapse Start/Stop...',  'timelapse' };
     for index1 = 1:size(labs, 1)
       method    = labs{index1,2};
-      m1        = uimenu(m0, 'Label', labs{index1,1}, 'Callback', @MenuCallback, ...
-        'UserData',{ method, self });
+      m1        = uimenu(m0, 'Label', labs{index1,1}, ...
+        'Callback', {@MenuCallback, method, self });
     end
-    
-    % TODO: add pointers
   
   else
     if numel(h) > 1, delete(h(2:end)); h=h(1); end
@@ -732,12 +752,55 @@ function plot_window(self)
   set(h, 'Name', [ 'SonyAlpha: ' self.cameraStatus ' ' self.url ]);
 end % plot_window
 
-function MenuCallback(src, evnt)
+function plot_pointers(src, evnt, self, cmd)
+  % plot pointers and marks
+  
+  fig = findall(0, 'Tag', 'SonyAlpha');
+  if isempty(fig), return; end
+  set(fig, 'HandleVisibility','on', 'NextPlot','add');
+  
+  for f={'SonyAlpha_Pointers','SonyAlpha_Line1','SonyAlpha_Line2'}
+    h = findall(0, 'Tag', f{1});
+    if ~isempty(h), delete(h); end
+  end
+  
+  if nargin > 3
+    switch cmd
+    case 'new'
+      % add a new pointer
+      [x,y] = ginput(1);
+      self.x(end+1) = x;
+      self.y(end+1) = y;
+    case 'clear'
+      self.x = [];
+      self.y = [];
+    case 'toggle'
+      self.show_lines = ~self.show_lines;
+    end
+  end
+  hold on
+  h = scatter(self.x,self.y, 400, 'g', '+');
+  set(h, 'Tag', 'SonyAlpha_Pointers');
+  
+  if self.show_lines
+    xl = xlim(gca);
+    yl = ylim(gca);
+    hl = line([ min(xl) max(xl) ], [ min(yl) max(yl)]);
+    set(hl, 'LineStyle','--','Tag', 'SonyAlpha_Line1');
+    hl = line([ min(xl) max(xl) ], [ max(yl) min(yl)]);
+    set(hl, 'LineStyle','--','Tag', 'SonyAlpha_Line2');
+  end
+  
+  set(fig, 'HandleVisibility','off', 'NextPlot','new');
+  
+end % plot_pointers
+
+function MenuCallback(src, evnt, varargin)
   % menu actions, as stored in the uimenu UserData
 
   arg = get(src, 'UserData');
   
-  feval(arg{1}, arg{2:end});
+  feval(varargin{:});
 
 end % MenuCallback
 
