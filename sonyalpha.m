@@ -121,8 +121,8 @@ classdef sonyalpha < handle
           self.available.(f{1}) = {'2.8' '3.5' '4.0' '4.5' '5.0' '5.6' '6.3' ...
            '7.1' '8.0' '9.0' '10' '11' '13' '16' '20' '22' };
         elseif strcmp(f{1}, 'shutter') && isempty(this)
-          self.available.(f{1}) = {'30"' '25"' '20"' '15"' '10"' '5"' '4"' ...
-          '3"' '2"' '1"' '1/10' '1/30' '1/60' '1/125' '1/250' '1/400' '1/1000' };
+          self.available.(f{1}) = {'30\"' '25\"' '20\"' '15\"' '10\"' '5\"' '4\"' ...
+          '3\"' '2\"' '1\"' '1/10' '1/30' '1/60' '1/125' '1/250' '1/400' '1/1000' };
         end
       end
        
@@ -134,7 +134,7 @@ classdef sonyalpha < handle
       start(self.updateTimer);
 
       disp([ mfilename ': [' datestr(now) '] Welcome to Sony Alpha ' char(self.version) ' at ' char(self.url) ]);
-      plot_window(self);
+      plot(self);
 
     end % sonyalpha
     
@@ -162,12 +162,13 @@ classdef sonyalpha < handle
       % decode JSON output into struct
       try
         if ~isempty(message)
+          index = isstrprop(message, 'print');
+          message = message(index);
           message = strrep(message, '\/','/');
           message = loadjson(message); % We use JSONlab reader which is more robust
         end
       catch
         disp(cmd)
-        message
         error([ mfilename ': Invalid JSON result. Perhaps the connection failed ?' ])
       end
 
@@ -366,6 +367,11 @@ classdef sonyalpha < handle
       % could also launch external viewer:
       % gst-launch-1.0 souphttpsrc location=http://192.168.122.1:8080/liveview/liveviewstream ! sonyalphademux ! jpegparse ! jpegdec ! videoconvert ! autovideosink
       
+      % check for SonyAlpha viewer
+      h = findall(0, 'Tag', 'SonyAlpha');
+      if isempty(h)
+        plot_window(self);
+      end
       % start the LiveView mode and get a frame
       filename = [ tempname '.jpg' ];
       % get the livestream URL e.g. 
@@ -479,7 +485,7 @@ classdef sonyalpha < handle
       elseif strcmp(lower(value), 'available') || strcmp(lower(value), 'supported')
         ret = api(self, 'getSupportedSelfTimer');
       else
-        ret = self.api('setSelfTimer', num2str(value));
+        ret = self.api('setSelfTimer', value);
       end
     end % timer
     
@@ -497,8 +503,8 @@ classdef sonyalpha < handle
         ret = api(self, 'getSupportedShutterSpeed');
       else
         if isnumeric(value)
-          if   value >= 1, value = sprintf('%d"',  ceil(value));
-          else             value = sprintf('1/%d', ceil(1/value)); end
+          if   value >= 1, value = sprintf('%d\\"', ceil(value));
+          else             value = sprintf('1/%d',  ceil(1/value)); end
         end
         ret = self.api('setShutterSpeed', num2str(value));
       end
@@ -661,7 +667,7 @@ function plot_window(self)
       'Accelerator','w', 'Separator','on');
       
     m0 = uimenu(h, 'Label', 'View');
-    labs = { 'Show grid',          'grid on'; ...
+    labs = { 'Toggle grid',          'grid'; ...
              'Brighter',  ''; ...
              'Darker',  ''; ...
              'Add Pointer...',     '' };
@@ -694,25 +700,26 @@ function plot_window(self)
         if isstruct(available{index2})
           available{index2} = getfield(available{index2},'whiteBalanceMode');
         end
-        m2 = uimenu(m1, 'Label', num2str(available{index2}));
-      %    'Callback', [ method(self, num2str(available{index2})) ]);
+        m2 = uimenu(m1, 'Label', num2str(available{index2}), ...
+          'Callback', @MenuCallback, 'UserData',{ method, self, available{index2}});
       end
     end
+    uimenu(m0, 'Label', 'Zoom in',  'Callback', @MenuCallback, ...
+      'Accelerator','i', 'Separator','on', 'UserData',{ 'zoom', self, 'in'});
+    uimenu(m0, 'Label', 'Zoom out', 'Callback', @MenuCallback, ...
+      'Accelerator','o', 'UserData',{ 'zoom', self, 'out'});
   
     m0 = uimenu(h, 'Label', 'Shoot');
-    labs = { 'Single',                    @image; ...
-             'Continuous Start/Stop',     @continuous; ...
-             'Time-Lapse Start/Stop...',  @timelapse };
+    labs = { 'Single',                    'image'; ...
+             'Continuous Start/Stop',     'continuous'; ...
+             'Time-Lapse Start/Stop...',  'timelapse' };
     for index1 = 1:size(labs, 1)
       method    = labs{index1,2};
-      m1        = uimenu(m0, 'Label', labs{index1,1});
-     %   'Callback', [ method(self) ]);
+      m1        = uimenu(m0, 'Label', labs{index1,1}, 'Callback', @MenuCallback, ...
+        'UserData',{ method, self });
     end
     
     % TODO: add pointers
-    
-    % plot the first image
-    plot(self);
   
   else
     if numel(h) > 1, delete(h(2:end)); h=h(1); end
@@ -722,4 +729,13 @@ function plot_window(self)
   set(h, 'HandleVisibility','on', 'NextPlot','add');
   set(h, 'Name', [ 'SonyAlpha: ' self.cameraStatus ' ' self.url ]);
 end % plot_window
+
+function MenuCallback(src, evnt)
+
+
+  arg = get(src, 'UserData');
+  
+  feval(arg{1}, arg{2:end});
+
+end % MenuCallback
 
