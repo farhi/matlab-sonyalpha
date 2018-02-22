@@ -131,6 +131,7 @@ classdef sonyalpha < handle
           'Period', 5.0, 'ExecutionMode', 'fixedDelay', ...
           'Name', mfilename);
       set(self.updateTimer, 'UserData', self);
+      start(self.updateTimer);
 
       disp([ mfilename ': [' datestr(now) '] Welcome to Sony Alpha ' char(self.version) ' at ' char(self.url) ]);
       plot_window(self);
@@ -593,7 +594,7 @@ classdef sonyalpha < handle
       elseif any(strcmpi(d, {'in','out'}))
         json = [ '{"method": "setZoomSetting","params": ["zoom", "On:Clear Image Zoom"],"id": 1,"version": "1.0"}' ];
         ret = curl(self, json);
-        json = [ '{"method": "actZoom","params": ["dir", "1shot"],"id": 1,"version": "1.0"}' ];
+        json = [ '{"method": "actZoom","params": ["' d '", "1shot"],"id": 1,"version": "1.0"}' ];
         ret = curl(self, json);
       else ret = [];
       end
