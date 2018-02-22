@@ -107,6 +107,9 @@ classdef sonyalpha < handle
       
       self.version = self.api('getApplicationInfo');
       if iscell(self.version), self.version = [ self.version{:} ]; end
+      
+      ret = self.api('startRecMode');
+      self.getstatus;
 
       for f = {'mode','iso','timer','fnumber','white','exp','shutter','focus'}
         self.available.(f{1}) = feval(f{1}, self, 'available');
@@ -127,11 +130,7 @@ classdef sonyalpha < handle
           'Period', 5.0, 'ExecutionMode', 'fixedDelay', ...
           'Name', mfilename);
       set(self.updateTimer, 'UserData', self);
-      
-      % get available settings
-      self.start;
-      
-      
+
       disp([ mfilename ': [' datestr(now) '] Welcome to Sony Alpha ' char(self.version) ' at ' char(self.url) ]);
       plot_window(self);
 
