@@ -44,14 +44,31 @@ classdef sonyalpha < handle
   % router. If you are already connected to the Internet, you have to drop your
   % current connection, or use an additional Wifi adapter (e.g. USB-Wifi).
   %
+  % Using the Plot Window
+  % ---------------------
+  %
+  %  The Plot window is shown when shooting stil images or updating the LiveView. 
+  %  It contains the File, View, Settings and Shoot menus.
+  %
+  %  The View menu allows to add Pointers and Marks on top of the current image. 
+  %  These can be used for e.g. alignment. You can equally add Pointers directly
+  %  right-clicking on the image.
+  %
+  %  The Settings menu allows to change the most important camera settings, including 
+  %  the zoom level (when available).
+  %
+  %  The Shoot menu allows to take a single picture, update the live view (lower 
+  %  resolution), as well as start a continuous or timelapse shooting. To stop the 
+  %  continuous/timelapse session, select the Shoot item again.
+  %
   % Requirements/Installation
   % -------------------------
   %
   %  - Matlab, no external toolbox
   %  - A wifi connection
   %  - A Sony Camera
-  %  - curl
-  %  - ffmpeg (for liveview)
+  %  - curl. Get it at https://curl.haxx.se/
+  %  - ffmpeg (for liveview). Get it at https://www.ffmpeg.org/
   %
   %  Just copy the files and go into the directory. Then type commands above, once the
   %  camera is configured (see above).
@@ -92,6 +109,7 @@ classdef sonyalpha < handle
     timelapse_clock = 0;    % clock when last shot
     timelapse_interval = 0; % time between shots
     figure   = [];
+    axes     = [];
     x        = []; % a list of coordinates where to add pointers
     y        = [];
     show_lines = false;
@@ -131,13 +149,13 @@ classdef sonyalpha < handle
        
       % init timer for regular updates, timelapse, etc
       self.updateTimer  = timer('TimerFcn', @TimerCallback, ...
-          'Period', 5.0, 'ExecutionMode', 'fixedDelay', ...
+          'Period', 2.0, 'ExecutionMode', 'fixedDelay', ...
           'Name', mfilename);
       set(self.updateTimer, 'UserData', self);
       start(self.updateTimer);
 
       disp([ mfilename ': [' datestr(now) '] Welcome to Sony Alpha ' char(self.version) ' at ' char(self.url) ]);
-      plot(self);
+      plot(self); % request initial LiveView
 
     end % sonyalpha
     
@@ -259,15 +277,20 @@ classdef sonyalpha < handle
       % start: set the camera into shooting mode
       ret = self.api('startRecMode');
       self.getstatus;
-      if strcmp(self.updateTimer.Running, 'off') start(self.updateTimer); end
+      if strcmp(self.updateTimer.Running, 'off') 
+        start(self.updateTimer); plot(self);
+      end
     end % start
     
     function ret = stop(self)
       % stop: stop the camera shooting.
       % 
       % start(s) must be used to be able to take pictures again.
-      ret = self.api('stopRecMode');
+      if strcmp(self.updateTimer.Running, 'on') 
+        stop(self.updateTimer);
+      end
       self.timelapse_clock = 0;
+      if ishandle(self.figure), close(self.figure); end
     end % stop
     
     function url = urlread(self)
@@ -354,7 +377,8 @@ classdef sonyalpha < handle
       
       [im, exif] = imread(self);
       fig        = plot_window(self);
-      h          = image(im);
+      h          = image(im); axis tight;
+      set(h, 'ButtonDownFcn',        {@ButtonDownCallback, self});
       set(fig, 'HandleVisibility','off', 'NextPlot','new');
       plot_pointers('','',self);
     end % image
@@ -378,20 +402,35 @@ classdef sonyalpha < handle
       % check for SonyAlpha viewer
       
       % start the LiveView mode and get a frame
-      filename = [ tempname '.jpg' ];
+      filename = fullfile(tempdir, 'LiveView.jpg');
       % get the livestream URL e.g. 
       %   http://192.168.122.1:8080/liveview/liveviewstream
       url = self.api('startLiveview');
       cmd = [ 'ffmpeg  -ss 1 -i ' url ' -frames:v 1 ' filename ];
+      if strcmp(self.updateTimer.Running,'on')
+        if ispc
+          cmd = [ 'start /b ' cmd ];
+        else
+          cmd = [ cmd '&' ];
+        end
+      end
+      
       [ret, message] = system(cmd);
       self.api('stopLiveView');
-      % read the image and display it. delete tmp file.
-      im  = imread(filename);
-      fig = plot_window(self);
-      h   = image(im);
-      set(fig, 'HandleVisibility','off', 'NextPlot','new');
-      delete(filename);
-      plot_pointers('','',self);
+      % when timer is Running, the image will be displayed by its Callback
+      
+      if strcmp(self.updateTimer.Running,'on')
+        h = [];
+      else
+        % read the image and display it. delete tmp file.
+        im  = imread(filename);
+        fig = plot_window(self);
+        h   = image(im); axis tight;
+        set(h, 'ButtonDownFcn',        {@ButtonDownCallback, self});
+        set(fig, 'HandleVisibility','off', 'NextPlot','new');
+        delete(filename);
+        plot_pointers('','',self);
+      end
       
     end % plot
     
@@ -528,7 +567,7 @@ classdef sonyalpha < handle
         ret = api(self, 'getShutterSpeed');
       elseif strcmp(lower(value), 'available') || strcmp(lower(value), 'supported')
         ret = api(self, 'getSupportedShutterSpeed');
-        ret = strrep(ret, '"', '\"');
+        if ~isempty(ret), ret = strrep(ret, '"', '\"'); end
       else
         if isnumeric(value)
           if   value >= 1, value = sprintf('%d\\"', ceil(value));
@@ -638,10 +677,6 @@ classdef sonyalpha < handle
   
 end % sonyalpha class
 
-% internal communication done with curl ----------------------------------------
-
-
-
 % main timer to auto update the camera status and handle e.g. time-lapse
 % ----------------------------------------------------------------------
 
@@ -660,6 +695,21 @@ function TimerCallback(src, evnt)
     end
   end
   
+  % test if an image was generated in background and update the plot
+  filename = fullfile(tempdir, 'LiveView.jpg');
+  if exist(filename, 'file')
+    % read the image and display it. delete tmp file.
+    im  = imread(filename);
+    fig = plot_window(self);
+    h   = image(im); axis tight;
+    set(h, 'ButtonDownFcn',        {@ButtonDownCallback, self});
+    set(fig, 'HandleVisibility','off', 'NextPlot','new');
+    delete(filename);
+    plot_pointers('','',self);
+    
+    % trigger new image
+    plot(self);
+  end
   
   
 end % TimerCallback
@@ -685,7 +735,7 @@ function h = plot_window(self)
     uimenu(m, 'Label', 'Print',        ...
       'Callback', 'printdlg(gcbf)');
     uimenu(m, 'Label', 'Close',        ...
-      'Callback', 'filemenufcn(gcbf,''FileClose'')', ...
+      'Callback', {@MenuCallback, 'stop', self }, ...
       'Accelerator','w', 'Separator','on');
       
     m0 = uimenu(h, 'Label', 'View');
@@ -735,6 +785,8 @@ function h = plot_window(self)
     m0 = uimenu(h, 'Label', 'Shoot');
     uimenu(m0, 'Label', 'Update Live-View', 'Accelerator','u', ...
       'Callback', {@MenuCallback, 'plot', self });
+    uimenu(m0, 'Label', 'Reset', 'Accelerator','u', ...
+      'Callback', {@MenuCallback, 'start', self });
     labs = { 'Single',                    'image'; ...
              'Continuous Start/Stop',     'continuous'; ...
              'Time-Lapse Start/Stop...',  'timelapse' };
@@ -743,21 +795,24 @@ function h = plot_window(self)
       m1        = uimenu(m0, 'Label', labs{index1,1}, ...
         'Callback', {@MenuCallback, method, self });
     end
-  
+    self.axes   = gca;
+    self.figure = h;
+    set(self.axes, 'Tag', 'SonyAlpha_Axes');
   else
     if numel(h) > 1, delete(h(2:end)); h=h(1); end
     set(0, 'CurrentFigure',h);
   end
-  self.figure = h;
-  set(h, 'HandleVisibility','on', 'NextPlot','add');
-  set(h, 'Name', [ 'SonyAlpha: ' self.cameraStatus ' ' self.url ]);
+  cla(self.axes);
+  set(self.figure, 'HandleVisibility','on', 'NextPlot','add');
+  set(self.figure, 'Name', [ 'SonyAlpha: ' self.cameraStatus ' ' self.url ]);
+  
 end % plot_window
 
 function plot_pointers(src, evnt, self, cmd)
   % plot pointers and marks
   
-  fig = findall(0, 'Tag', 'SonyAlpha');
-  if isempty(fig), return; end
+  fig = self.figure;
+  if ~ishandle(fig), return; end
   set(fig, 'HandleVisibility','on', 'NextPlot','add');
   
   for f={'SonyAlpha_Pointers','SonyAlpha_Line1','SonyAlpha_Line2'}
@@ -765,13 +820,16 @@ function plot_pointers(src, evnt, self, cmd)
     if ~isempty(h), delete(h); end
   end
   
+  xl = xlim(self.axes);
+  yl = ylim(self.axes);
+    
   if nargin > 3
     switch cmd
     case 'new'
       % add a new pointer
       [x,y] = ginput(1);
-      self.x(end+1) = x;
-      self.y(end+1) = y;
+      self.x(end+1) = x/max(xl);
+      self.y(end+1) = y/max(yl);
     case 'clear'
       self.x = [];
       self.y = [];
@@ -779,17 +837,19 @@ function plot_pointers(src, evnt, self, cmd)
       self.show_lines = ~self.show_lines;
     end
   end
-  hold on
-  h = scatter(self.x,self.y, 400, 'g', '+');
-  set(h, 'Tag', 'SonyAlpha_Pointers');
   
-  if self.show_lines
-    xl = xlim(gca);
-    yl = ylim(gca);
-    hl = line([ min(xl) max(xl) ], [ min(yl) max(yl)]);
-    set(hl, 'LineStyle','--','Tag', 'SonyAlpha_Line1');
-    hl = line([ min(xl) max(xl) ], [ max(yl) min(yl)]);
-    set(hl, 'LineStyle','--','Tag', 'SonyAlpha_Line2');
+  if gcf == fig
+    hold on
+    
+    h = scatter(self.x*max(xl),self.y*max(yl), 400, 'g', '+');
+    set(h, 'Tag', 'SonyAlpha_Pointers');
+    
+    if self.show_lines
+      hl = line([ 0 max(xl) ], [ 0 max(yl)]);
+      set(hl, 'LineStyle','--','Tag', 'SonyAlpha_Line1');
+      hl = line([ 0 max(xl) ], [ max(yl) 0]);
+      set(hl, 'LineStyle','--','Tag', 'SonyAlpha_Line2');
+    end
   end
   
   set(fig, 'HandleVisibility','off', 'NextPlot','new');
@@ -804,4 +864,23 @@ function MenuCallback(src, evnt, varargin)
   feval(varargin{:});
 
 end % MenuCallback
+
+function ButtonDownCallback(src, evnt, self)
+  % ButtonDownCallback: callback when user clicks on the StarBook image
+  % where the mouse click is
+
+  fig = self.figure;
+  if ~ishandle(fig), return; end
+  
+  if strcmp(get(self.figure, 'SelectionType'),'alt')
+    
+    xy = get(self.axes, 'CurrentPoint'); 
+    x = xy(1,1); y = xy(1,2);
+
+    self.x(end+1) = x/max(xlim(self.axes));
+    self.y(end+1) = y/max(ylim(self.axes));
+
+  end
+  
+end % ButtonDownCallback
 
