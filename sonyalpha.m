@@ -100,6 +100,7 @@ classdef sonyalpha < handle
     status        = struct();
     available     = struct();
     version       = '2.40';
+    liveview      = true;
   end % properties
   
   properties (Access=private)
@@ -290,7 +291,8 @@ classdef sonyalpha < handle
         stop(self.updateTimer);
       end
       self.timelapse_clock = 0;
-      if ishandle(self.figure), close(self.figure); end
+      self.liveview        = false;
+      if ishandle(self.figure), delete(self.figure); end
     end % stop
     
     function url = urlread(self)
@@ -417,12 +419,12 @@ classdef sonyalpha < handle
       
       [ret, message] = system(cmd);
       self.api('stopLiveView');
-      % when timer is Running, the image will be displayed by its Callback
       
-      if strcmp(self.updateTimer.Running,'on')
+      % when timer is Running, the image will be displayed by its Callback
+      if self.liveview
         h = [];
       else
-        % read the image and display it. delete tmp file.
+        % read the image and display it immediately. delete tmp file.
         im  = imread(filename);
         fig = plot_window(self);
         h   = image(im); axis tight;
@@ -697,7 +699,7 @@ function TimerCallback(src, evnt)
   
   % test if an image was generated in background and update the plot
   filename = fullfile(tempdir, 'LiveView.jpg');
-  if exist(filename, 'file')
+  if self.liveview && exist(filename, 'file')
     % read the image and display it. delete tmp file.
     im  = imread(filename);
     fig = plot_window(self);
@@ -724,7 +726,8 @@ function h = plot_window(self)
   if isempty(h)
     % build the plot/menu window
     h = figure('Tag', 'SonyAlpha', ...
-      'UserData', self, 'MenuBar','none');
+      'UserData', self, 'MenuBar','none', ...
+      'CloseRequestFcn', {@MenuCallback, 'stop', self });
       
     % File menu
     m = uimenu(h, 'Label', 'File');
@@ -745,8 +748,12 @@ function h = plot_window(self)
       'Callback', {@plot_pointers, self, 'clear'});
     uimenu(m0, 'Label', 'Show/Hide Lines', ...
       'Callback', {@plot_pointers, self, 'toggle'});
+    m1 = uimenu(m0, 'Label', 'Auto Update', ...
+      'Callback', {@MenuCallback, 'autoupdate', self }, 'Separator','on');
+    if self.liveview, set(m1, 'Checked','on');
+    else              set(m1, 'Checked','off'); end
     uimenu(m0, 'Label', 'About Sony Alpha', ...
-      'Callback', {@MenuCallback, 'about', self }, 'Separator','on');
+      'Callback', {@MenuCallback, 'about', self });
     
     % Settings menu
     m0 = uimenu(h, 'Label', 'Settings');
@@ -829,11 +836,12 @@ function plot_pointers(src, evnt, self, cmd)
       % add a new pointer
       
       % halt the timer to avoid update during ginput
-      flag = strcmp(self.updateTimer.Running, 'on');
-      if flag, stop(self.updateTimer); end
+      flag = self.liveview;
+      if flag, self.liveview=false; end
+      axes(self.axes);
       [x,y] = ginput(1);
       % restart timer if it was running
-      if flag, start(self.updateTimer); end
+      if flag, self.liveview=true; end
       
       self.x(end+1) = x/max(xl);
       self.y(end+1) = y/max(yl);
@@ -844,20 +852,18 @@ function plot_pointers(src, evnt, self, cmd)
       self.show_lines = ~self.show_lines;
     end
   end
+
+  hold on
+  h = scatter(self.x*max(xl),self.y*max(yl), 400, 'g', '+');
+  set(h, 'Tag', 'SonyAlpha_Pointers');
   
-  if gcf == fig
-    hold on
-    
-    h = scatter(self.x*max(xl),self.y*max(yl), 400, 'g', '+');
-    set(h, 'Tag', 'SonyAlpha_Pointers');
-    
-    if self.show_lines
-      hl = line([ 0 max(xl) ], [ 0 max(yl)]);
-      set(hl, 'LineStyle','--','Tag', 'SonyAlpha_Line1');
-      hl = line([ 0 max(xl) ], [ max(yl) 0]);
-      set(hl, 'LineStyle','--','Tag', 'SonyAlpha_Line2');
-    end
+  if self.show_lines
+    hl = line([ 0 max(xl) ], [ 0 max(yl)]);
+    set(hl, 'LineStyle','--','Tag', 'SonyAlpha_Line1');
+    hl = line([ 0 max(xl) ], [ max(yl) 0]);
+    set(hl, 'LineStyle','--','Tag', 'SonyAlpha_Line2');
   end
+
   
   set(fig, 'HandleVisibility','off', 'NextPlot','new');
   
@@ -868,7 +874,14 @@ function MenuCallback(src, evnt, varargin)
 
   arg = get(src, 'UserData');
   
-  feval(varargin{:});
+  if numel(varargin) > 1 && strcmp(varargin{1}, 'autoupdate')
+    self = varargin{2};
+    self.liveview = ~self.liveview;
+    if self.liveview, set(src, 'Checked','on');
+    else              set(src, 'Checked','off'); end
+  else
+    feval(varargin{:});
+  end
 
 end % MenuCallback
 
