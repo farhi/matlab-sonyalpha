@@ -63,7 +63,8 @@ Using the Plot Window
   contains the File, View, Settings and Shoot menus.
 
   The View menu allows to add Pointers and Marks on top of the current image. These
-  can be used for e.g. alignment.
+  can be used for e.g. alignment. You can equally add Pointers directly
+  right-clicking on the image.
 
   The Settings menu allows to change the most important camera settings, including
   the zoom level (when available). 

@@ -827,7 +827,14 @@ function plot_pointers(src, evnt, self, cmd)
     switch cmd
     case 'new'
       % add a new pointer
+      
+      % halt the timer to avoid update during ginput
+      flag = strcmp(self.updateTimer.Running, 'on');
+      if flag, stop(self.updateTimer); end
       [x,y] = ginput(1);
+      % restart timer if it was running
+      if flag, start(self.updateTimer); end
+      
       self.x(end+1) = x/max(xl);
       self.y(end+1) = y/max(yl);
     case 'clear'
