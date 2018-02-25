@@ -113,6 +113,7 @@ classdef sonyalpha < handle
     axes     = [];
     x        = []; % a list of coordinates where to add pointers
     y        = [];
+    int      = []; % the intensity contrast around pointers
     show_lines = false;
 
   end % properties
@@ -138,7 +139,7 @@ classdef sonyalpha < handle
         self.available.(f{1}) = feval(f{1}, self, 'available');
         this = self.available.(f{1});
         if strcmp(f{1}, 'exp')
-          self.available.(f{1}) = unique(round((min(this):max(this))/3));
+          self.available.(f{1}) = unique(round((min(this):max(this))/3))*3;
         elseif strcmp(f{1}, 'fnumber') && isempty(this)
           self.available.(f{1}) = {'2.8' '3.5' '4.0' '4.5' '5.0' '5.6' '6.3' ...
            '7.1' '8.0' '9.0' '10' '11' '13' '16' '20' '22' };
@@ -380,7 +381,8 @@ classdef sonyalpha < handle
       [im, exif] = imread(self);
       fig        = plot_window(self);
       h          = image(im); axis tight;
-      set(h, 'ButtonDownFcn',        {@ButtonDownCallback, self});
+      set(h, 'ButtonDownFcn',        {@ButtonDownCallback, self}, ...
+        'Tag', 'SonyAlpha_Image');
       set(fig, 'HandleVisibility','off', 'NextPlot','new');
       plot_pointers('','',self);
     end % image
@@ -421,14 +423,15 @@ classdef sonyalpha < handle
       self.api('stopLiveView');
       
       % when timer is Running, the image will be displayed by its Callback
-      if self.liveview
+      if self.liveview && strcmp(self.updateTimer.Running, 'on') 
         h = [];
-      else
+      elseif exist(filename, 'file')
         % read the image and display it immediately. delete tmp file.
         im  = imread(filename);
         fig = plot_window(self);
         h   = image(im); axis tight;
-        set(h, 'ButtonDownFcn',        {@ButtonDownCallback, self});
+        set(h, 'ButtonDownFcn',        {@ButtonDownCallback, self}, ...
+          'Tag', 'SonyAlpha_Image');
         set(fig, 'HandleVisibility','off', 'NextPlot','new');
         delete(filename);
         plot_pointers('','',self);
@@ -679,42 +682,7 @@ classdef sonyalpha < handle
   
 end % sonyalpha class
 
-% main timer to auto update the camera status and handle e.g. time-lapse
-% ----------------------------------------------------------------------
 
-function TimerCallback(src, evnt)
-  % TimerCallback: update from timer event
-  self = get(src, 'UserData');
-  if isvalid(self), self.getstatus; 
-  else delete(src); return; end
-  
-  % handle continuous shooting mode: do something when camera is IDLE
-  if strcmpi(self.cameraStatus,'IDLE')
-    if any(self.timelapse_clock) && etime(clock, self.timelapse_clock) > self.timelapse_interval
-      self.timelapse_clock     = clock;
-      url = self.urlread;
-      disp([ mfilename ': [' datestr(now) '] image ' url ]);
-    end
-  end
-  
-  % test if an image was generated in background and update the plot
-  filename = fullfile(tempdir, 'LiveView.jpg');
-  if self.liveview && exist(filename, 'file')
-    % read the image and display it. delete tmp file.
-    im  = imread(filename);
-    fig = plot_window(self);
-    h   = image(im); axis tight;
-    set(h, 'ButtonDownFcn',        {@ButtonDownCallback, self});
-    set(fig, 'HandleVisibility','off', 'NextPlot','new');
-    delete(filename);
-    plot_pointers('','',self);
-    
-    % trigger new image
-    plot(self);
-  end
-  
-  
-end % TimerCallback
 
 % simple interface build: show current live-view/last image, and
 % camera set-up menu.
@@ -762,7 +730,7 @@ function h = plot_window(self)
              'Aperture (F/D)',          'fnumber'; ...
              'Shutter Speed',           'shutter'; ...
              'ISO',                     'iso'; ...
-             'Exp. Compensation (EV)',  'exp'; ...
+             'Exp. Compensation (EV/3)',  'exp'; ...
              'White Balance',           'white'; ...
              'Focus',                   'focus'; ...
              'Timer',                   'timer' };
@@ -822,7 +790,7 @@ function plot_pointers(src, evnt, self, cmd)
   if ~ishandle(fig), return; end
   set(fig, 'HandleVisibility','on', 'NextPlot','add');
   
-  for f={'SonyAlpha_Pointers','SonyAlpha_Line1','SonyAlpha_Line2'}
+  for f={'SonyAlpha_Pointers','SonyAlpha_Line1','SonyAlpha_Line2','SonyAlpha_Info'}
     h = findall(0, 'Tag', f{1});
     if ~isempty(h), delete(h); end
   end
@@ -852,6 +820,14 @@ function plot_pointers(src, evnt, self, cmd)
       self.show_lines = ~self.show_lines;
     end
   end
+  
+  % compute the peak width around pointers
+  h = findall(0, 'Tag', 'SonyAlpha_Image');
+  int = 0;
+  if ~isempty(h) % not implemented yet
+    im = get(h, 'CData');
+    % self.int = blurMetric(im);
+  end
 
   hold on
   h = scatter(self.x*max(xl),self.y*max(yl), 400, 'g', '+');
@@ -863,11 +839,23 @@ function plot_pointers(src, evnt, self, cmd)
     hl = line([ 0 max(xl) ], [ max(yl) 0]);
     set(hl, 'LineStyle','--','Tag', 'SonyAlpha_Line2');
   end
-
   
+  % now display the shutter F exp ISO
+  wb = strtok(self.whiteBalance); if numel(wb)> 4, wb=wb(1:4); end
+  settings = sprintf('%s F%s EV%d ISO %s %s %f', ...
+    self.shutterSpeed, self.fNumber, self.exposureCompensation, ...
+    self.isoSpeedRate, wb, self.int);
+  t = text(0.05*max(xl), .95*max(yl), settings);
+  set(t,'Color', 'y', 'FontSize', 18, 'Tag', 'SonyAlpha_Info');
+
   set(fig, 'HandleVisibility','off', 'NextPlot','new');
   
 end % plot_pointers
+
+
+% ------------------------------------------------------------------------------
+% CallBacks
+% ------------------------------------------------------------------------------
 
 function MenuCallback(src, evnt, varargin)
   % menu actions, as stored in the uimenu UserData
@@ -899,8 +887,47 @@ function ButtonDownCallback(src, evnt, self)
 
     self.x(end+1) = x/max(xlim(self.axes));
     self.y(end+1) = y/max(ylim(self.axes));
-
+    
+    plot_pointers('','',self);
   end
   
 end % ButtonDownCallback
+
+% main timer to auto update the camera status and handle e.g. time-lapse
+% ----------------------------------------------------------------------
+
+function TimerCallback(src, evnt)
+  % TimerCallback: update from timer event
+  self = get(src, 'UserData');
+  if isvalid(self), self.getstatus; 
+  else delete(src); return; end
+  
+  % handle continuous shooting mode: do something when camera is IDLE
+  if strcmpi(self.cameraStatus,'IDLE')
+    if any(self.timelapse_clock) && etime(clock, self.timelapse_clock) > self.timelapse_interval
+      self.timelapse_clock     = clock;
+      url = self.urlread;
+      disp([ mfilename ': [' datestr(now) '] image ' url ]);
+    end
+  end
+  
+  % test if an image was generated in background and update the plot
+  filename = fullfile(tempdir, 'LiveView.jpg');
+  if self.liveview && exist(filename, 'file')
+    % read the image and display it. delete tmp file.
+    im  = imread(filename);
+    fig = plot_window(self);
+    h   = image(im); axis tight;
+    set(h, 'ButtonDownFcn',        {@ButtonDownCallback, self}, ...
+      'Tag', 'SonyAlpha_Image');
+    set(fig, 'HandleVisibility','off', 'NextPlot','new');
+    delete(filename);
+    plot_pointers('','',self);
+    
+    % trigger new image
+    plot(self);
+  end
+  
+  
+end % TimerCallback
 
