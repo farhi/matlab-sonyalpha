@@ -60,7 +60,8 @@ Using the Plot Window
 ![Image of SonyAlpha](https://github.com/farhi/matlab-sonyalpha/blob/master/doc/SonyAlpha_image.png)
 
   The Plot window is shown when shooting stil images or updating the LiveView. It
-  contains the File, View, Settings and Shoot menus.
+  contains the File, View, Settings and Shoot menus. It also shows the main
+  settings, as well as a focus quality measure (higher is better).
 
   The View menu allows to add Pointers and Marks on top of the current image. These
   can be used for e.g. alignment. You can equally add Pointers directly

@@ -48,7 +48,8 @@ classdef sonyalpha < handle
   % ---------------------
   %
   %  The Plot window is shown when shooting stil images or updating the LiveView. 
-  %  It contains the File, View, Settings and Shoot menus.
+  %  It contains the File, View, Settings and Shoot menus. It also shows the main
+  %  settings, as well as a focus quality measure (higher is better).
   %
   %  The View menu allows to add Pointers and Marks on top of the current image. 
   %  These can be used for e.g. alignment. You can equally add Pointers directly
@@ -179,6 +180,7 @@ classdef sonyalpha < handle
       if ret % error
         disp(cmd)
         disp([ mfilename ': Connection failed: ' url])
+        disp('You need to restart the SonyAlpha with: start(s)');
         error(message);
       end
       
@@ -192,7 +194,7 @@ classdef sonyalpha < handle
         end
       catch
         disp(cmd)
-        error([ mfilename ': Invalid JSON result. Perhaps the connection failed ?' ])
+        disp([ mfilename ': Invalid JSON result. Perhaps the connection failed ?' ])
       end
 
       if isstruct(message) && isfield(message, 'result') && ischar(message.result)
@@ -273,6 +275,12 @@ classdef sonyalpha < handle
       
       ret  = curl(self, json, service);
     end % api
+    
+    function url=help(self)
+      % help(sb): open the Help page
+      url = fullfile('file:///',fileparts(which(mfilename)),'doc','SonyAlpha.html');
+      open_system_browser(url);
+    end
     
     % Camera Shooting ----------------------------------------------------------
     function ret = start(self)
@@ -407,20 +415,22 @@ classdef sonyalpha < handle
       
       % start the LiveView mode and get a frame
       filename = fullfile(tempdir, 'LiveView.jpg');
-      % get the livestream URL e.g. 
-      %   http://192.168.122.1:8080/liveview/liveviewstream
-      url = self.api('startLiveview');
-      cmd = [ 'ffmpeg  -ss 1 -i ' url ' -frames:v 1 ' filename ];
-      if strcmp(self.updateTimer.Running,'on')
-        if ispc
-          cmd = [ 'start /b ' cmd ];
-        else
-          cmd = [ cmd '&' ];
+      if ~exist(filename, 'file')
+        % get the livestream URL e.g. 
+        %   http://192.168.122.1:8080/liveview/liveviewstream
+        url = self.api('startLiveview');
+        cmd = [ 'ffmpeg  -ss 1 -i ' url ' -frames:v 1 ' filename ];
+        if strcmp(self.updateTimer.Running,'on')
+          if ispc
+            cmd = [ 'start /b ' cmd ];
+          else
+            cmd = [ cmd '&' ];
+          end
         end
+        
+        [ret, message] = system(cmd);
+        self.api('stopLiveView');
       end
-      
-      [ret, message] = system(cmd);
-      self.api('stopLiveView');
       
       % when timer is Running, the image will be displayed by its Callback
       if self.liveview && strcmp(self.updateTimer.Running, 'on') 
@@ -720,6 +730,8 @@ function h = plot_window(self)
       'Callback', {@MenuCallback, 'autoupdate', self }, 'Separator','on');
     if self.liveview, set(m1, 'Checked','on');
     else              set(m1, 'Checked','off'); end
+    uimenu(m0, 'Label', 'Help', ...
+      'Callback', {@MenuCallback, 'help', self });
     uimenu(m0, 'Label', 'About Sony Alpha', ...
       'Callback', {@MenuCallback, 'about', self });
     
@@ -825,8 +837,11 @@ function plot_pointers(src, evnt, self, cmd)
   h = findall(0, 'Tag', 'SonyAlpha_Image');
   int = 0;
   if ~isempty(h) % not implemented yet
-    im = get(h, 'CData');
-    % self.int = blurMetric(im);
+    im = double(get(h, 'CData'));
+    % a blurred image has smooth variations. We sum up diff
+    im1 = abs(diff(im,[], 1))/numel(im);
+    im2 = abs(diff(im,[], 2))/numel(im);
+    self.int = sum(im1(:))+sum(im2(:));
   end
 
   hold on
@@ -842,7 +857,7 @@ function plot_pointers(src, evnt, self, cmd)
   
   % now display the shutter F exp ISO
   wb = strtok(self.whiteBalance); if numel(wb)> 4, wb=wb(1:4); end
-  settings = sprintf('%s F%s EV%d ISO %s %s %f', ...
+  settings = sprintf('%s F%s EV%d ISO %s %s Foc:%.2f', ...
     self.shutterSpeed, self.fNumber, self.exposureCompensation, ...
     self.isoSpeedRate, wb, self.int);
   t = text(0.05*max(xl), .95*max(yl), settings);
@@ -851,6 +866,24 @@ function plot_pointers(src, evnt, self, cmd)
   set(fig, 'HandleVisibility','off', 'NextPlot','new');
   
 end % plot_pointers
+
+function ret=open_system_browser(url)
+  % opens URL with system browser. Returns non zero in case of error.
+  if strncmp(url, 'file://', length('file://'))
+    url = url(8:end);
+  end
+  ret = 1;
+  if ismac,      precmd = 'DYLD_LIBRARY_PATH= ;';
+  elseif isunix, precmd = 'LD_LIBRARY_PATH= ; '; 
+  else           precmd=''; end
+  if ispc
+    ret=system([ precmd 'start "' url '"']);
+  elseif ismac
+    ret=system([ precmd 'open "' url '"']);
+  else
+    [ret, message]=system([ precmd 'xdg-open "' url '"']);
+  end
+end % open_system_browser
 
 
 % ------------------------------------------------------------------------------
@@ -899,7 +932,8 @@ end % ButtonDownCallback
 function TimerCallback(src, evnt)
   % TimerCallback: update from timer event
   self = get(src, 'UserData');
-  if isvalid(self), self.getstatus; 
+  if isvalid(self), 
+    try; self.getstatus; end
   else delete(src); return; end
   
   % handle continuous shooting mode: do something when camera is IDLE
