@@ -116,6 +116,7 @@ classdef sonyalpha < handle
     y        = [];
     int      = []; % the intensity contrast around pointers
     show_lines = false;
+    ffmpeg   = [];
 
   end % properties
   
@@ -129,6 +130,8 @@ classdef sonyalpha < handle
       if nargin > 1
         self.url = url;
       end
+      
+      
       
       self.version = self.api('getApplicationInfo');
       if iscell(self.version), self.version = [ self.version{:} ]; end
@@ -151,13 +154,15 @@ classdef sonyalpha < handle
       end
        
       % init timer for regular updates, timelapse, etc
+      disp([ mfilename ': [' datestr(now) '] Welcome to Sony Alpha ' char(self.version) ' at ' char(self.url) ]);
+      self.ffmpeg = ffmpeg_check;
+      
       self.updateTimer  = timer('TimerFcn', @TimerCallback, ...
           'Period', 2.0, 'ExecutionMode', 'fixedDelay', ...
           'Name', mfilename);
       set(self.updateTimer, 'UserData', self);
       start(self.updateTimer);
 
-      disp([ mfilename ': [' datestr(now) '] Welcome to Sony Alpha ' char(self.version) ' at ' char(self.url) ]);
       plot(self); % request initial LiveView
 
     end % sonyalpha
@@ -276,13 +281,13 @@ classdef sonyalpha < handle
       ret  = curl(self, json, service);
     end % api
     
+    % usual object life handling -----------------------------------------------
     function url=help(self)
       % help(sb): open the Help page
       url = fullfile('file:///',fileparts(which(mfilename)),'doc','SonyAlpha.html');
       open_system_browser(url);
     end
     
-    % Camera Shooting ----------------------------------------------------------
     function ret = start(self)
       % start: set the camera into shooting mode
       ret = self.api('startRecMode');
@@ -296,6 +301,7 @@ classdef sonyalpha < handle
       % stop: stop the camera shooting.
       % 
       % start(s) must be used to be able to take pictures again.
+      %          Then use e.g. plot(s)
       if strcmp(self.updateTimer.Running, 'on') 
         stop(self.updateTimer);
       end
@@ -304,6 +310,14 @@ classdef sonyalpha < handle
       if ishandle(self.figure), delete(self.figure); end
     end % stop
     
+    function delete(self)
+      % delete: delete the SonyAlpha connection
+      stop(self);
+      delete(self.updateTimer);
+    end
+    
+    
+    % Camera Shooting ----------------------------------------------------------
     function url = urlread(self)
       % urlread: take a picture and return the distant URL (no upload)
       %
@@ -413,13 +427,16 @@ classdef sonyalpha < handle
       
       % check for SonyAlpha viewer
       
+      
+      if isempty(self.ffmpeg), return; end
+      
       % start the LiveView mode and get a frame
       filename = fullfile(tempdir, 'LiveView.jpg');
       if ~exist(filename, 'file')
         % get the livestream URL e.g. 
         %   http://192.168.122.1:8080/liveview/liveviewstream
         url = self.api('startLiveview');
-        cmd = [ 'ffmpeg  -ss 1 -i ' url ' -frames:v 1 ' filename ];
+        cmd = [ self.ffmpeg ' -ss 1 -i ' url ' -frames:v 1 ' filename ];
         if strcmp(self.updateTimer.Running,'on')
           if ispc
             cmd = [ 'start /b ' cmd ];
@@ -885,6 +902,35 @@ function ret=open_system_browser(url)
   end
 end % open_system_browser
 
+function present = ffmpeg_check
+% check if ffmpeg is present
+
+  % required to avoid Matlab to use its own libraries
+  if ismac,      precmd = 'DYLD_LIBRARY_PATH= ; DISPLAY= ; ';
+  elseif isunix, precmd = 'LD_LIBRARY_PATH= ;  DISPLAY= ; '; 
+  else           precmd = ''; end
+  
+  present = '';
+  for totest = { 'ffmpeg' }
+    if ~isempty(present), break; end
+    for ext={'','.exe','.out'}
+      % look for executable and test with various extensions
+      [status, result] = system([ precmd totest{1} ext{1} ]);
+      if (status == 1 || status == 255) 
+        present = [ totest{1} ext{1} ];
+        break
+      end
+    end
+  end
+  
+  if isempty(present)
+    disp([ mfilename ': WARNING: FFMPEG executable is not installed. Get it at https://www.ffmpeg.org/' ]);
+    disp('  The LiveView will be unactivated, but you can still take pictures.')
+  else
+    disp([ '  FFMPEG          (https://www.ffmpeg.org/) as "' present '"' ]);
+  end
+  
+end
 
 % ------------------------------------------------------------------------------
 % CallBacks
