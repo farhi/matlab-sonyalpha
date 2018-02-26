@@ -427,7 +427,7 @@ classdef sonyalpha < handle
       
       % check for SonyAlpha viewer
       
-      
+      h = [];
       if isempty(self.ffmpeg), return; end
       
       % start the LiveView mode and get a frame
@@ -451,7 +451,7 @@ classdef sonyalpha < handle
       
       % when timer is Running, the image will be displayed by its Callback
       if self.liveview && strcmp(self.updateTimer.Running, 'on') 
-        h = [];
+        return
       elseif exist(filename, 'file')
         % read the image and display it immediately. delete tmp file.
         im  = imread(filename);
