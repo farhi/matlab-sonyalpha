@@ -54,12 +54,18 @@ Connecting the Camera
   router. If you are already connected to the Internet, you have to drop your
   current connection, or use an additional Wifi adapter (e.g. USB-Wifi).
   
+  If you need to specify the camera IP, use:
+  
+```matlab
+>> camera = sonyalpha('http://192.168.122.1:8080');
+```
+  
 Using the Plot Window
 ---------------------
 
 ![Image of SonyAlpha](https://github.com/farhi/matlab-sonyalpha/blob/master/doc/SonyAlpha_image.png)
 
-  The Plot window is shown when shooting stil images or updating the LiveView. It
+  The Plot window is shown when shooting still images or updating the LiveView. It
   contains the File, View, Settings and Shoot menus. It also shows the main
   settings, as well as a focus quality measure (higher is better).
 

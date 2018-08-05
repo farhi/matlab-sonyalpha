@@ -44,10 +44,14 @@ classdef sonyalpha < handle
   % router. If you are already connected to the Internet, you have to drop your
   % current connection, or use an additional Wifi adapter (e.g. USB-Wifi).
   %
+  % If you need to specify the camera IP, use:
+  %
+  % >> camera = sonyalpha('http://192.168.122.1:8080');
+  %
   % Using the Plot Window
   % ---------------------
   %
-  %  The Plot window is shown when shooting stil images or updating the LiveView. 
+  %  The Plot window is shown when shooting still images or updating the LiveView. 
   %  It contains the File, View, Settings and Shoot menus. It also shows the main
   %  settings, as well as a focus quality measure (higher is better).
   %
@@ -599,6 +603,7 @@ classdef sonyalpha < handle
         ret = api(self, 'getShutterSpeed');
       elseif strcmp(lower(value), 'available') || strcmp(lower(value), 'supported')
         ret = api(self, 'getSupportedShutterSpeed');
+        if iscell(ret), ret=ret{end}; end
         if ~isempty(ret), ret = strrep(ret, '"', '\"'); end
       else
         if isnumeric(value)
