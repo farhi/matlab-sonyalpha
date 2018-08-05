@@ -106,6 +106,7 @@ classdef sonyalpha < handle
     available     = struct();
     version       = '2.40';
     liveview      = true;
+    UserData      = [];
   end % properties
   
   properties (Access=private)
