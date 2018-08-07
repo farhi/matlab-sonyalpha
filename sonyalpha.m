@@ -31,9 +31,11 @@ classdef sonyalpha < handle
   %   continuous:         start/stop continuous shooting with current settings.
   %   timelapse:          start/stop timelapse  shooting with current settings.
   %
-  % Connecting the Camera
+  % Connecting the Camera: wifi or USB
   % ---------------------
   % 
+  % WIFI:
+  %
   % Start your camera and use its Remote Control App (e.g. Play Memories App) 
   % from the Camera settings. This starts the JSON REST HTTP server, used to 
   % control the camera. The Network SSID is shown on the Camera screen.
@@ -47,6 +49,12 @@ classdef sonyalpha < handle
   % If you need to specify the camera IP, use:
   %
   % >> camera = sonyalpha('http://192.168.122.1:8080');
+  %
+  % USB:
+  %
+  % Alternatively, your can connect the camera with a USB cable. The gphoto2 
+  % library will then be used (must be installed - see http://www.gphoto.org/).
+  % Set the USB camera in 'PC remote' mode or alternatively 
   %
   % Using the Plot Window
   % ---------------------
@@ -136,7 +144,13 @@ classdef sonyalpha < handle
         self.url = url;
       end
       
-      
+      % check if IP is reachable
+      ip = regexp(self.url, '([012]?\d{1,2}\.){3}[012]?\d{1,2}','match');
+      ip = java.net.InetAddress.getByName(char(ip));
+      if ~ip.isReachable(10)
+        disp([ mfilename ': IP ' self.url ' is not reachable. Trying USB connection through gphoto2...' ])
+        self.url = 'gphoto2';
+      end
       
       self.version = self.api('getApplicationInfo');
       if iscell(self.version), self.version = [ self.version{:} ]; end
@@ -148,7 +162,9 @@ classdef sonyalpha < handle
         self.available.(f{1}) = feval(f{1}, self, 'available');
         this = self.available.(f{1});
         if strcmp(f{1}, 'exp')
+          try
           self.available.(f{1}) = unique(round((min(this):max(this))/3))*3;
+          end
         elseif strcmp(f{1}, 'fnumber') && isempty(this)
           self.available.(f{1}) = {'2.8' '3.5' '4.0' '4.5' '5.0' '5.6' '6.3' ...
            '7.1' '8.0' '9.0' '10' '11' '13' '16' '20' '22' };
@@ -180,12 +196,18 @@ classdef sonyalpha < handle
       else           precmd=''; end
       
       if nargin < 3, target = 'camera'; end
-      url = fullfile(self.url, 'sony', target);
       
-      cmd = [ 'curl -d ''' post ''' ' url ];
-      
-      % evaluate command
-      [ret, message]=system([ precmd  cmd ]);
+      if any(strcmp(self.url, {'gphoto2','gphoto', 'usb'}))
+        cmd = post;
+        [ret, message] = api_gphoto2(self, post, target);
+      else
+        url = fullfile(self.url, 'sony', target);
+        
+        cmd = [ 'curl -d ''' post ''' ' url ];
+        
+        % evaluate command
+        [ret, message]=system([ precmd  cmd ]);
+      end
       
       if ret % error
         disp(cmd)
@@ -195,16 +217,19 @@ classdef sonyalpha < handle
       end
       
       % decode JSON output into struct
-      try
-        if ~isempty(message)
-          index = isstrprop(message, 'print');
-          message = message(index);
-          message = strrep(message, '\/','/');
-          message = loadjson(message); % We use JSONlab reader which is more robust
+      if ~any(strcmp(self.url, {'gphoto2','gphoto', 'usb'}))
+        try
+          if ~isempty(message)
+            index = isstrprop(message, 'print');
+            message = message(index);
+            message = strrep(message, '\/','/');
+            message = loadjson(message); % We use JSONlab reader which is more robust
+          end
+        catch
+          disp(cmd)
+          disp(message)
+          disp([ mfilename ': Invalid JSON result. Perhaps the connection failed ?' ])
         end
-      catch
-        disp(cmd)
-        disp([ mfilename ': Invalid JSON result. Perhaps the connection failed ?' ])
       end
 
       if isstruct(message) && isfield(message, 'result') && ischar(message.result)
@@ -227,6 +252,7 @@ classdef sonyalpha < handle
       % getstatus: get the Camera status and all settings
       json = '{"method": "getEvent", "params": [false], "id": 1, "version": "1.2"}';
       message = curl(self, json);
+      if ~iscell(message), message = { message }; end
       status  = struct();
       status.unsorted ={};
       for index=1:numel(message)
@@ -441,17 +467,20 @@ classdef sonyalpha < handle
         % get the livestream URL e.g. 
         %   http://192.168.122.1:8080/liveview/liveviewstream
         url = self.api('startLiveview');
-        cmd = [ self.ffmpeg ' -ss 1 -i ' url ' -frames:v 1 ' filename ];
-        if strcmp(self.updateTimer.Running,'on')
-          if ispc
-            cmd = [ 'start /b ' cmd ];
-          else
-            cmd = [ cmd '&' ];
+        if ischar(url)
+          cmd = [ self.ffmpeg ' -ss 1 -i ' url ' -frames:v 1 ' filename ];
+          if strcmp(self.updateTimer.Running,'on')
+            if ispc
+              cmd = [ 'start /b ' cmd ];
+            else
+              cmd = [ cmd '&' ];
+            end
           end
+          
+          [ret, message] = system(cmd);
+          self.api('stopLiveView');
+        else return
         end
-        
-        [ret, message] = system(cmd);
-        self.api('stopLiveView');
       end
       
       % when timer is Running, the image will be displayed by its Callback
