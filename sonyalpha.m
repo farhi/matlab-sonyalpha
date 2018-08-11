@@ -27,6 +27,7 @@ classdef sonyalpha < handle
   %   imread:             take a picture and download the RGB image (no display)
   %   image:              take a picture and display it
   %   plot:               show the live-view image (not stored)
+  %   close:              close plot/image window and stop shoting mode.
   %
   %   continuous:         start/stop continuous shooting with current settings.
   %   timelapse:          start/stop timelapse  shooting with current settings.
@@ -109,6 +110,7 @@ classdef sonyalpha < handle
     isoSpeedRate  = 'AUTO';
     shutterSpeed  = '1/60';
     whiteBalance  = 'Auto WB';
+    imageQuality  = 'Standard';
     
     status        = struct();
     available     = struct();
@@ -130,6 +132,7 @@ classdef sonyalpha < handle
     int      = []; % the intensity contrast around pointers
     show_lines = false;
     ffmpeg   = [];
+    period   = 2.0;
 
   end % properties
   
@@ -140,7 +143,7 @@ classdef sonyalpha < handle
       %   s = sonyalpha;
       %
       % the default url is http://192.168.122.1:8080/sony/camera
-      if nargin > 1
+      if nargin == 1
         self.url = url;
       end
       
@@ -152,13 +155,25 @@ classdef sonyalpha < handle
         self.url = 'gphoto2';
       end
       
-      self.version = self.api('getApplicationInfo');
+      if any(strcmp(self.url, {'gphoto2','gphoto', 'usb'}))
+        self.url    = 'gphoto2';
+        self.period = 20.0;
+        self.liveview = false;
+      end
+      
+      try
+        self.version = self.api('getApplicationInfo');
+      catch ME
+        getReport(ME)
+        error([ mfilename ': No Camera found.' ]);
+      end
       if iscell(self.version), self.version = [ self.version{:} ]; end
       
       ret = self.api('startRecMode');
       self.getstatus;
 
-      for f = {'mode','iso','timer','fnumber','white','exp','shutter','focus'}
+      % get the camera available settings
+      for f = {'mode','iso','timer','fnumber','white','exp','shutter','focus','quality'}
         self.available.(f{1}) = feval(f{1}, self, 'available');
         this = self.available.(f{1});
         if strcmp(f{1}, 'exp')
@@ -175,16 +190,19 @@ classdef sonyalpha < handle
       end
        
       % init timer for regular updates, timelapse, etc
-      disp([ mfilename ': [' datestr(now) '] Welcome to Sony Alpha ' char(self.version) ' at ' char(self.url) ]);
+      disp([ mfilename ': [' datestr(now) '] Welcome to Sony Alpha ' num2str(self.version) ' at ' char(self.url) ]);
       self.ffmpeg = ffmpeg_check;
       
       self.updateTimer  = timer('TimerFcn', @TimerCallback, ...
-          'Period', 2.0, 'ExecutionMode', 'fixedDelay', ...
+          'Period', self.period, 'ExecutionMode', 'fixedDelay', ...
           'Name', mfilename);
       set(self.updateTimer, 'UserData', self);
       start(self.updateTimer);
-
-      plot(self); % request initial LiveView
+      try
+        plot(self); % request initial LiveView
+      catch ME
+        getReport(ME);
+      end
 
     end % sonyalpha
     
@@ -199,7 +217,7 @@ classdef sonyalpha < handle
       
       if any(strcmp(self.url, {'gphoto2','gphoto', 'usb'}))
         cmd = post;
-        [ret, message] = api_gphoto2(self, post, target);
+        [ret, message, self] = api_gphoto2(self, post, target);
       else
         url = fullfile(self.url, 'sony', target);
         
@@ -287,6 +305,7 @@ classdef sonyalpha < handle
       try; self.isoSpeedRate = status.isoSpeedRate.currentIsoSpeedRate; end
       try; self.shutterSpeed = status.shutterSpeed.currentShutterSpeed; end
       try; self.whiteBalance = status.whiteBalance.currentWhiteBalanceMode; end
+      try; self.imageQuality = status.imageQuality.currentImageQuality; end
 
     end % getstatus
     
@@ -319,21 +338,27 @@ classdef sonyalpha < handle
       open_system_browser(url);
     end
     
-    function ret = start(self)
+    function start(self)
       % start: set the camera into shooting mode
       ret = self.api('startRecMode');
       self.getstatus;
+      if isempty(self.updateTimer) || ~isvalid(self.updateTimer)
+        self.updateTimer  = timer('TimerFcn', @TimerCallback, ...
+          'Period', self.period 'ExecutionMode', 'fixedDelay', ...
+          'Name', mfilename);
+      set(self.updateTimer, 'UserData', self);
+      end
       if strcmp(self.updateTimer.Running, 'off') 
         start(self.updateTimer); plot(self);
       end
     end % start
     
-    function ret = stop(self)
+    function stop(self)
       % stop: stop the camera shooting.
       % 
-      % start(s) must be used to be able to take pictures again.
-      %          Then use e.g. plot(s)
-      if strcmp(self.updateTimer.Running, 'on') 
+      % Then, start(s) must be used to be able to take pictures again.
+      %          Use e.g. plot(s) to display the interface.
+      if isvalid(self.updateTimer) && strcmp(self.updateTimer.Running, 'on') 
         stop(self.updateTimer);
       end
       self.timelapse_clock = 0;
@@ -341,10 +366,11 @@ classdef sonyalpha < handle
       if ishandle(self.figure), delete(self.figure); end
     end % stop
     
-    function delete(self)
+    function close(self)
       % delete: delete the SonyAlpha connection
       stop(self);
       delete(self.updateTimer);
+      self.updateTimer='';
     end
     
     
@@ -357,38 +383,60 @@ classdef sonyalpha < handle
       % image remains on the camera.
       url = self.api('actTakePicture');
       if iscellstr(url)
-        url = char(url);
+        url = char(url); % ok
       else
         self.start; % try to start the camera
         disp([ mfilename ': camera is not ready.' ]);
       end
     end % urlread
     
-    function [im,url] = urlwrite(self, filename)
-      % urlread: take a picture, and download it as a local file
+    function [im,url,info] = urlwrite(self, filename)
+      % urlwrite: take a picture, and download it as a local file
       %
       % [im, url] = urlwrite(s, filename)
       %   write image into 'filename' and return the distant image URL.
       %
       % Must have used 'start' before (e.g. at init).
       % The resulting image is the 'postview' one, e.g. 2M pixels. The original
-      % image remains on the camera.
+      % image remains on the camera (WIFI mode). In GPhoto mode, the files are
+      % the full images.
       
       if nargin < 2, filename = ''; end
       
       % get the URL and its extension
       url = self.urlread;
-      [p, f, ext] = fileparts(url);
-        
-      if isempty(filename)
-        filename = [ f e ]; % saves locally using the distant image name
-      else
-        % check extension
-        [p,f,E] = fileparts(filename);
-        if isempty(E), filename = [ filename ext ]; end
+      
+      if any(strcmp(self.url, {'gphoto2','gphoto', 'usb'}))
+        % for gphoto, we just read the images and return
+        im = {}; url = cellstr(url); info={};
+        for index=1:size(url, 1)
+          disp(url{index})
+          try
+            info{end+1} = imfinfo(url{index});
+          catch
+            info{end+1} =  [];
+          end
+          try
+            im{end+1}   = imread(url{index});
+          catch
+            im{end+1}   = [];
+          end
+        end
+      else % wifi API: download images
+      
+        [p, f, ext] = fileparts(url);
+          
+        if isempty(filename)
+          filename = [ f e ]; % saves locally using the distant image name
+        else
+          % check extension
+          [p,f,E] = fileparts(filename);
+          if isempty(E), filename = [ filename ext ]; end
+        end
+        % then get URL and display it
+        im   = urlwrite(url, filename);
+        info = imfinfo(filename);
       end
-      % then get URL and display it
-      im   = urlwrite(url, filename);
     end % urlwrite
     
     function urldelete(self, filename)
@@ -404,20 +452,20 @@ classdef sonyalpha < handle
     end % urldelete
     
     function [im, exif] = imread(self)
-      % imread: take a picture, and read it as an RGB matrix.
+      % imread: take a picture, read it as an RGB matrix, and delete any local file.
       %
       % [im, exif] = imread(s)
       %   returns the EXIF data.
       %
       % Must have used 'start' before (e.g. at init).
       % The resulting image is the 'postview' one, e.g. 2M pixels. The original
-      % image remains on the camera.
-      filename = tempname;
-      url  = self.urlwrite(filename);
-      
-      im   = imread(url); % local file
-      if nargout > 1, exif = imfinfo(url); end
-      delete(url);
+      % image remains on the camera. In GPhoto mode, the files are
+      % the full images.
+      [im,url,exif] = urlwrite(self, tempname);
+      if ~iscellstr(url), url = cellstr(url); end
+      for index=1:numel(url)
+        try; delete(url{index}); end
+      end
      
     end % imread
     
@@ -429,11 +477,21 @@ classdef sonyalpha < handle
       %
       % Must have used 'start' before (e.g. at init).
       % The resulting image is the 'postview' one, e.g. 2M pixels. The original
-      % image remains on the camera.
+      % image remains on the camera. In GPhoto mode, the files are
+      % the full images.
       
       [im, exif] = imread(self);
       fig        = plot_window(self);
+      if iscell(im)
+        im = im{end};
+      end
+      try
       h          = image(im); axis tight;
+      catch
+      whos im;
+      end
+      % save the LiveView.jpg image to show in the plot window
+      imwrite(im, fullfile(tempdir, 'LiveView.jpg'));
       set(h, 'ButtonDownFcn',        {@ButtonDownCallback, self}, ...
         'Tag', 'SonyAlpha_Image');
       set(fig, 'HandleVisibility','off', 'NextPlot','new');
@@ -467,24 +525,28 @@ classdef sonyalpha < handle
         % get the livestream URL e.g. 
         %   http://192.168.122.1:8080/liveview/liveviewstream
         url = self.api('startLiveview');
-        if ischar(url)
-          cmd = [ self.ffmpeg ' -ss 1 -i ' url ' -frames:v 1 ' filename ];
-          if strcmp(self.updateTimer.Running,'on')
-            if ispc
-              cmd = [ 'start /b ' cmd ];
-            else
-              cmd = [ cmd '&' ];
+        if any(strcmp(self.url, {'gphoto2','gphoto', 'usb'}))
+          disp(url);
+        else
+          if ischar(url) && ~isempty(self.ffmpeg)
+            cmd = [ self.ffmpeg ' -ss 1 -i ' url ' -frames:v 1 ' filename ];
+            if strcmp(self.updateTimer.Running,'on')
+              if ispc
+                cmd = [ 'start /b ' cmd ];
+              else
+                cmd = [ cmd '&' ];
+              end
             end
+            
+            [ret, message] = system(cmd);
+            self.api('stopLiveView');
+          else return
           end
-          
-          [ret, message] = system(cmd);
-          self.api('stopLiveView');
-        else return
         end
       end
       
       % when timer is Running, the image will be displayed by its Callback
-      if self.liveview && strcmp(self.updateTimer.Running, 'on') 
+      if self.liveview && strcmp(self.updateTimer.Running, 'on')
         return
       elseif exist(filename, 'file')
         % read the image and display it immediately. delete tmp file.
@@ -710,6 +772,22 @@ classdef sonyalpha < handle
       end
     end % exp
     
+    function ret=quality(self, value)
+      % quality(s):      get the image quality
+      % quality(s, val): set the image quality as a string
+      % quality(s, 'supported') return supported image quality (strings)
+      %
+      % The qualityn value can be e.g. "RAW+JPEG", "Fine", "Standard"
+      if nargin < 2, value = ''; end
+      if isempty(value)
+        ret = api(self, 'getStillQuality');
+      elseif strcmp(lower(value), 'available') || strcmp(lower(value), 'supported')
+        ret = api(self, 'getSupportedStillQuality');
+      else
+        ret = self.api('setStillQuality', value);
+      end
+    end % exp
+    
     function ret=focus(self, value)
       % focus(s):      get the focus mode 
       % focus(s, val): set the focus mode as a string
@@ -806,12 +884,17 @@ function h = plot_window(self)
       if isnumeric(available)
         available = num2cell(available);
       end
-      for index2 = 1:numel(available)
-        if isstruct(available{index2})
-          available{index2} = getfield(available{index2},'whiteBalanceMode');
+      if ~isempty(available) && iscell(available)
+        for index2 = 1:numel(available)
+          if isstruct(available{index2})
+            available{index2} = getfield(available{index2},'whiteBalanceMode');
+          end
+          if isnumeric(available{index2}) && numel(available{index2}) > 1
+            tmp = available{index2}; tmp=tmp(:)'; available{index2} = tmp;
+          end
+          m2 = uimenu(m1, 'Label', num2str(available{index2}), ...
+            'Callback', {@MenuCallback, method, self, available{index2} });
         end
-        m2 = uimenu(m1, 'Label', num2str(available{index2}), ...
-          'Callback', {@MenuCallback, method, self, available{index2} });
       end
     end
     uimenu(m0, 'Label', 'Zoom in',  ...
@@ -910,8 +993,9 @@ function plot_pointers(src, evnt, self, cmd)
   % now display the shutter F exp ISO
   wb = strtok(self.whiteBalance); if numel(wb)> 4, wb=wb(1:4); end
   settings = sprintf('%s F%s EV%d ISO %s %s Foc:%.2f', ...
-    self.shutterSpeed, self.fNumber, self.exposureCompensation, ...
-    self.isoSpeedRate, wb, self.int);
+    num2str(self.shutterSpeed), num2str(self.fNumber), ...
+    num2str(self.exposureCompensation), ...
+    num2str(self.isoSpeedRate), wb, self.int);
   t = text(0.05*max(xl), .95*max(yl), settings);
   set(t,'Color', 'y', 'FontSize', 18, 'Tag', 'SonyAlpha_Info');
 
@@ -1016,7 +1100,7 @@ function TimerCallback(src, evnt)
   if isvalid(self), 
     try; self.getstatus; end
   else delete(src); return; end
-  
+
   % handle continuous shooting mode: do something when camera is IDLE
   if strcmpi(self.cameraStatus,'IDLE')
     if any(self.timelapse_clock) && etime(clock, self.timelapse_clock) > self.timelapse_interval
@@ -1025,9 +1109,10 @@ function TimerCallback(src, evnt)
       disp([ mfilename ': [' datestr(now) '] image ' url ]);
     end
   end
-  
+
   % test if an image was generated in background and update the plot
   filename = fullfile(tempdir, 'LiveView.jpg');
+
   if self.liveview && exist(filename, 'file')
     % read the image and display it. delete tmp file.
     im  = imread(filename);
@@ -1042,7 +1127,6 @@ function TimerCallback(src, evnt)
     % trigger new image
     plot(self);
   end
-  
   
 end % TimerCallback
 
