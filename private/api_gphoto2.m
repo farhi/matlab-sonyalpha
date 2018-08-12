@@ -1,5 +1,11 @@
 function [ret, message, self] = api_gphoto2(self, post, target)
   % api_gphoto2: emulate the Sony API commands through gphoto calls
+  
+  persistent exe
+  
+  if isempty(executable)
+    exe = gphoto_executable;
+  end
 
   % first decode the JSON command
   json = loadjson(post);
@@ -13,8 +19,8 @@ function [ret, message, self] = api_gphoto2(self, post, target)
   switch json.method
 
   case 'getApplicationInfo'
-    gphoto_config1 = gphoto2_getconfig('deviceversion');
-    gphoto_config2 = gphoto2_getconfig('cameramodel');
+    gphoto_config1 = gphoto2_getconfig(exe, 'deviceversion');
+    gphoto_config2 = gphoto2_getconfig(exe, 'cameramodel');
     message = sprintf('%s %i', ...
       gphoto_config2.cameramodel.Current, ...
       gphoto_config1.deviceversion.Current);
@@ -22,7 +28,7 @@ function [ret, message, self] = api_gphoto2(self, post, target)
   case 'getEvent'
     % store current settings into object properties
     %  poke all config
-    gphoto_config = gphoto2_getconfig;
+    gphoto_config = gphoto2_getconfig(exe);
     status        = gphoto2status(gphoto_config);
     message = struct2cell(status);
         
@@ -36,14 +42,14 @@ function [ret, message, self] = api_gphoto2(self, post, target)
     
         
     % return image path as cellstr
-    message = gphoto2_capture;
+    message = gphoto2_capture(exe);
         
   case 'getCameraFunction' % / avContent (delete)
     disp([ mfilename ': unsupported feature: ' json.method ])
         
   case 'startLiveview'
     % can be very slow...
-    message = gphoto2_liveview(self, fullfile(tempdir, 'LiveView.jpg'));
+    message = gphoto2_liveview(exe, self, fullfile(tempdir, 'LiveView.jpg'));
 
   case 'stopLiveView'
 %    restore image quality
@@ -51,88 +57,88 @@ function [ret, message, self] = api_gphoto2(self, post, target)
 %    --set-config imagequality=ID
         
   case 'getIsoSpeedRate'                            % ISO
-    gphoto_config= gphoto2_getconfig('iso');
+    gphoto_config= gphoto2_getconfig(exe, 'iso');
     message = gphoto_config.iso.Current;
         
   case 'getSupportedIsoSpeedRate'
-    gphoto_config= gphoto2_getconfig('iso');
+    gphoto_config= gphoto2_getconfig(exe, 'iso');
     message = gphoto_config.iso.Choice;
         
   case 'setIsoSpeedRate'
     % --set-config iso=ID
-    message = gphoto2_setconfig('iso', json.params, self.available.iso);
+    message = gphoto2_setconfig(exe, 'iso', json.params, self.available.iso);
         
   case 'getExposureMode'                            % PASM
-    gphoto_config= gphoto2_getconfig('expprogram');
+    gphoto_config= gphoto2_getconfig(exe, 'expprogram');
     message = gphoto_config.expprogram.Current;
         
   case 'getSupportedExposureMode'
-    gphoto_config= gphoto2_getconfig('expprogram');
+    gphoto_config= gphoto2_getconfig(exe, 'expprogram');
     message = gphoto_config.expprogram.Choice;
         
   case 'setExposureMode'
     % --set-config exposurecompensation=id
-    message = gphoto2_setconfig('expprogram', json.params, self.available.mode);
+    message = gphoto2_setconfig(exe, 'expprogram', json.params, self.available.mode);
         
   case 'getSelfTimer'                               % Timer etc
-    gphoto_config= gphoto2_getconfig('capturemode');
+    gphoto_config= gphoto2_getconfig(exe, 'capturemode');
     message = gphoto_config.capturemode.Current;
         
   case 'getSupportedSelfTimer'
-    gphoto_config= gphoto2_getconfig('capturemode');
+    gphoto_config= gphoto2_getconfig(exe, 'capturemode');
     message = gphoto_config.capturemode.Choice;
         
   case 'setSelfTimer'
     % --set-config capturemode=ID
-    message = gphoto2_setconfig('capturemode', json.params, self.available.timer);
+    message = gphoto2_setconfig(exe, 'capturemode', json.params, self.available.timer);
         
   case 'getShutterSpeed'                            % shutter speed
-    gphoto_config= gphoto2_getconfig('shutterspeed');
+    gphoto_config= gphoto2_getconfig(exe, 'shutterspeed');
     message = gphoto_config.shutterspeed.Current;
         
   case 'getSupportedShutterSpeed'
-    gphoto_config= gphoto2_getconfig('shutterspeed');
+    gphoto_config= gphoto2_getconfig(exe, 'shutterspeed');
     message = []; % gphoto_config.shutterspeed.Choice;
         
   case 'setShutterSpeed'
     % --set-config shutterspeed=ID
-    message = gphoto2_setconfig('shutterspeed', json.params, []);
+    message = gphoto2_setconfig(exe, 'shutterspeed', json.params, []);
         
   case 'getFNumber'                                 % F value
-    gphoto_config= gphoto2_getconfig('f-number');
+    gphoto_config= gphoto2_getconfig(exe, 'f-number');
     message = gphoto_config.f0x2Dnumber.Current;
         
   case 'getSupportedFNumber'
-    gphoto_config= gphoto2_getconfig('f-number');
+    gphoto_config= gphoto2_getconfig(exe, 'f-number');
     message = []; % gphoto_config.f0x2Dnumber.Bottom : Top
         
   case 'setFNumber' 
     % --set-config f-number=ID
-    message = gphoto2_setconfig('f-number', json.params, self.available.fnumber);
+    message = gphoto2_setconfig(exe, 'f-number', json.params, self.available.fnumber);
         
   case 'getWhiteBalance'                            % while balance
-    gphoto_config= gphoto2_getconfig('whitebalance');
+    gphoto_config= gphoto2_getconfig(exe, 'whitebalance');
     message = gphoto_config.whitebalance.Current;
         
   case 'getSupportedWhiteBalance'
-    gphoto_config= gphoto2_getconfig('whitebalance');
+    gphoto_config= gphoto2_getconfig(exe, 'whitebalance');
     message = gphoto_config.whitebalance.Choice;
         
   case 'setWhiteBalance' 
     % --set-config whitebalance=ID
-    message = gphoto2_setconfig('whitebalance', json.params, self.available.white);
+    message = gphoto2_setconfig(exe, 'whitebalance', json.params, self.available.white);
         
   case 'getExposureCompensation'                    % ExposureCompensation
-    gphoto_config= gphoto2_getconfig('exposurecompensation');
+    gphoto_config= gphoto2_getconfig(exe, 'exposurecompensation');
     message = gphoto_config.exposurecompensation.Current;
         
   case 'getSupportedExposureCompensation'
-    gphoto_config= gphoto2_getconfig('exposurecompensation');
+    gphoto_config= gphoto2_getconfig(exe, 'exposurecompensation');
     message = gphoto_config.exposurecompensation.Choice;
         
   case 'setExposureCompensation'
     % --set-config exposurecompensation=ID
-    message = gphoto2_setconfig('exposurecompensation', json.params, self.available.exp);
+    message = gphoto2_setconfig(exe, 'exposurecompensation', json.params, self.available.exp);
         
   case 'setZoomSetting'
     disp([ mfilename ': unsupported feature: ' json.method ])
@@ -141,23 +147,23 @@ function [ret, message, self] = api_gphoto2(self, post, target)
     disp([ mfilename ': unsupported feature: ' json.method ])
   
   case 'getStillQuality'                               % Image Quality (RAW, JPEG)
-    gphoto_config= gphoto2_getconfig('imagequality');
+    gphoto_config= gphoto2_getconfig(exe, 'imagequality');
     message = gphoto_config.imagequality.Current;
         
   case 'getSupportedStillQuality'
-    gphoto_config= gphoto2_getconfig('imagequality');
+    gphoto_config= gphoto2_getconfig(exe, 'imagequality');
     message = gphoto_config.imagequality.Choice;
         
   case 'setStillQuality'
     % --set-config capturemode=ID
-    message = gphoto2_setconfig('imagequality', json.params, self.available.quality);
+    message = gphoto2_setconfig(exe, 'imagequality', json.params, self.available.quality);
         
   end % switch method
         
 end % api_gphoto2
         
 % ------------------------------------------------------------------------------
-function gphoto_config = gphoto2_getconfig(config)
+function gphoto_config = gphoto2_getconfig(exe, config)
 % gphoto2_getconfig: get the camera configuration
 
   % required to avoid Matlab to use its own libraries
@@ -167,14 +173,14 @@ function gphoto_config = gphoto2_getconfig(config)
   
   if nargin < 1, config = []; end
   if ~isempty(config)
-    cmd = [ precmd 'gphoto2 -q ' ]; 
+    cmd = [ precmd exe ' -q ' ]; 
     % handle multiple config
     if ~iscell(config), config = cellstr(config); end
     for index=1:numel(config)
       cmd = [ cmd ' --get-config ' config{index} ];
     end
   else
-    cmd = [ precmd 'gphoto2 --list-all-config -q' ];
+    cmd = [ precmd exe  ' --list-all-config -q' ];
   end
   
   [ret, message] = system(cmd);
@@ -217,7 +223,7 @@ function gphoto_config = gphoto2_getconfig(config)
 end % gphoto2_getconfig
 
 % ------------------------------------------------------------------------------
-function message = gphoto2_setconfig(config, value, choices)
+function message = gphoto2_setconfig(exe, config, value, choices)
 % gphoto2_setconfig: set the camera configuration
 
   % required to avoid Matlab to use its own libraries
@@ -233,15 +239,13 @@ function message = gphoto2_setconfig(config, value, choices)
     return;
   end
   
-  cmd = [ precmd 'gphoto2 -q' ];
+  cmd = [ precmd exe ' -q' ];
   
   % search for value in choices
   value = findValueInChoices(value, choices);
   
   % now assemble the command line
   cmd = [ cmd ' --set-config ' config '=' value ];
-
-  
  
   disp(cmd)
   [ret, message] = system(cmd);
@@ -255,8 +259,8 @@ end % gphoto2_setconfig
 
 % ------------------------------------------------------------------------------
 
-function filename = gphoto2_capture(filename)
-% gphoto2_capture: capture an image (single shoot)
+function filename = gphoto2_capture(exe, filename)
+% gphoto2_capture: capture an image (single shot)
 
   % required to avoid Matlab to use its own libraries
   if ismac,      precmd = 'DYLD_LIBRARY_PATH= ; DISPLAY= ; ';
@@ -282,7 +286,7 @@ function filename = gphoto2_capture(filename)
   if isempty(e) e= '.%C'; end
   gfile = fullfile(p, [f e ]);
   
-  cmd = [ precmd 'gphoto2 --capture-image-and-download ' ...
+  cmd = [ precmd exe ' --capture-image-and-download ' ...
     '--filename=''' gfile ''' --force-overwrite -q' ];
   disp(cmd);
   [ret, message] = system(cmd);
@@ -314,7 +318,7 @@ function filename = gphoto2_capture(filename)
 
 end % gphoto2_capture
 
-function message = gphoto2_liveview(self, filename)
+function message = gphoto2_liveview(exe, self, filename)
 % gphoto2_liveview: capture a 'fast' image for live view
 
   % required to avoid Matlab to use its own libraries
@@ -328,7 +332,7 @@ function message = gphoto2_liveview(self, filename)
   imagequality0= findValueInChoices(self.available.quality{1},self.available.quality);
   capturemode0 = findValueInChoices(self.available.timer{1},  self.available.timer);
   
-  cmd = [ precmd 'gphoto2 -q' ...
+  cmd = [ precmd exe ' -q' ...
     ' --set-config imagequality=' imagequality0  ...
     ' --set-config capturemode='  capturemode0 ...
     ' --capture-image-and-download --force-overwrite ' ...
@@ -465,3 +469,30 @@ function value = findValueInChoices(value, choices)
     if isfinite(str2double(t)) value = t; end
   end
 end % findValueInChoices
+
+function g = gphoto_executable
+  % search gphoto2 binary
+  
+  g = ''; 
+  if ismac,      precmd = 'DYLD_LIBRARY_PATH= ;';
+  elseif isunix, precmd = 'LD_LIBRARY_PATH= ; '; 
+  else           precmd=''; end
+  
+  if ispc, ext='.exe'; else ext=''; end
+  
+  % try in order: global(system), local, local_arch
+  for try_target={ [ 'gphoto2' ext ], 'gphoto2' }
+      
+    [status, result] = system([ precmd try_target{1} ' --version' ]); % run from Matlab
+
+    if status == 0
+        % the executable is there.
+        g = try_target{1};
+        return
+    end
+  end
+  
+  if isempty(g)
+    error([ mfilename ': GPHOTO is not available. Install it from gphoto.org' ])
+  end
+end % gphoto_executable

@@ -55,7 +55,7 @@ classdef sonyalpha < handle
   %
   % Alternatively, your can connect the camera with a USB cable. The gphoto2 
   % library will then be used (must be installed - see http://www.gphoto.org/).
-  % Set the USB camera in 'PC remote' mode or alternatively 
+  % Set the USB camera in 'PC remote' mode.
   %
   % Using the Plot Window
   % ---------------------
