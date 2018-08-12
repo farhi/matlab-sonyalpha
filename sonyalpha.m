@@ -79,10 +79,11 @@ classdef sonyalpha < handle
   % -------------------------
   %
   %  - Matlab, no external toolbox
-  %  - A wifi connection
+  %  - A wifi or USB connection
   %  - A Sony Camera
-  %  - curl. Get it at https://curl.haxx.se/
-  %  - ffmpeg (for liveview). Get it at https://www.ffmpeg.org/
+  %  - curl (for wifi connection). Get it at https://curl.haxx.se/
+  %  - ffmpeg (for liveview with Wifi). Get it at https://www.ffmpeg.org/
+  %  - GPhoto2 (for usb connection). Get it at http://gphoto.org
   %
   %  Just copy the files and go into the directory. Then type commands above, once the
   %  camera is configured (see above).
@@ -344,7 +345,7 @@ classdef sonyalpha < handle
       self.getstatus;
       if isempty(self.updateTimer) || ~isvalid(self.updateTimer)
         self.updateTimer  = timer('TimerFcn', @TimerCallback, ...
-          'Period', self.period 'ExecutionMode', 'fixedDelay', ...
+          'Period', self.period, 'ExecutionMode', 'fixedDelay', ...
           'Name', mfilename);
       set(self.updateTimer, 'UserData', self);
       end

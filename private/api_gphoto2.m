@@ -3,7 +3,7 @@ function [ret, message, self] = api_gphoto2(self, post, target)
   
   persistent exe
   
-  if isempty(executable)
+  if isempty(exe)
     exe = gphoto_executable;
   end
 
@@ -488,7 +488,8 @@ function g = gphoto_executable
     if status == 0
         % the executable is there.
         g = try_target{1};
-        return
+        disp([ '  GPhoto found as: ' g ]);
+        break
     end
   end
   

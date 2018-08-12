@@ -43,6 +43,8 @@ The LiveView image, that is shown with the "plot" method, is _NOT_ updated conti
  
 Connecting the Camera
 ---------------------
+
+**WIFI**
   
   Start your camera and use its Remote Control App (e.g. Play Memories App) 
   from the Camera settings. This starts the JSON REST HTTP server, used to 
@@ -59,6 +61,12 @@ Connecting the Camera
 ```matlab
 >> camera = sonyalpha('http://192.168.122.1:8080');
 ```
+
+**USB**
+
+  Alternatively, your can connect the camera with a USB cable. The gphoto2 
+  library will then be used (must be installed - see http://www.gphoto.org/).
+  Set the USB camera in 'PC remote' mode.
   
 Using the Plot Window
 ---------------------
@@ -84,10 +92,11 @@ Requirements/Installation
 -------------------------
 
 - Matlab, no external toolbox
-- A wifi connection
+- A wifi or USB connection
 - A Sony Camera
-- curl: Get it at https://curl.haxx.se/
-- ffmpeg (for liveview): Get it at https://www.ffmpeg.org/
+- curl (for wifi connection). Get it at https://curl.haxx.se/
+- ffmpeg (for liveview with Wifi). Get it at https://www.ffmpeg.org/
+- GPhoto2 (for usb connection). Get it at http://gphoto.org
 
 Just copy the files and go into the directory. Then type commands above, once the
 camera is configured (see above).

@@ -34,6 +34,7 @@
 
 
 
+
       a Sony Alpha Camera</p>
     <div align="center"><a
 href="https://github.com/farhi/matlab-sonyalpha/blob/master/doc/A6000.png"
@@ -54,6 +55,7 @@ href="https://github.com/farhi/matlab-sonyalpha/blob/master/doc/A6000.png"
       text-transform: none; white-space: normal; widows: 2;
       word-spacing: 0px; -webkit-text-stroke-width: 0px;
       text-decoration-style: initial; text-decoration-color: initial;">SONYALPHA:
+
 
 
 
@@ -113,6 +115,7 @@ href="https://github.com/farhi/matlab-sonyalpha/blob/master/doc/A6000.png"
 
 
 
+
       you can use the Methods:</p>
     <ul style="box-sizing: border-box; padding-left: 2em; margin-top:
       0px; margin-bottom: 16px; color: rgb(36, 41, 46); font-family:
@@ -161,6 +164,7 @@ href="https://github.com/farhi/matlab-sonyalpha/blob/master/doc/A6000.png"
 
 
 
+
         start/stop continuous shooting with current settings.</li>
       <li style="box-sizing: border-box; margin-top: 0.25em;">timelapse:
         start/stop timelapse shooting with current settings.</li>
@@ -176,6 +180,7 @@ href="https://github.com/farhi/matlab-sonyalpha/blob/master/doc/A6000.png"
       text-transform: none; white-space: normal; widows: 2;
       word-spacing: 0px; -webkit-text-stroke-width: 0px;
       text-decoration-style: initial; text-decoration-color: initial;">as
+
 
 
 
@@ -208,12 +213,15 @@ href="https://github.com/farhi/matlab-sonyalpha/blob/master/doc/A6000.png"
 
 
 
+
       LiveView image, that is shown with the "plot" method, is<span>&nbsp;</span><em
         style="box-sizing: border-box;">NOT</em><span>&nbsp;</span>updated
 
 
 
-      continuously, and is rather slow (e.g. 2s).</p>
+
+      continuously, and is rather slow (e.g. 2s, even slower with
+      GPhoto).</p>
     <h2 style="box-sizing: border-box; margin-top: 24px; margin-bottom:
       16px; font-size: 1.5em; font-weight: 600; line-height: 1.25;
       padding-bottom: 0.3em; border-bottom: 1px solid rgb(234, 236,
@@ -243,6 +251,7 @@ href="https://github.com/farhi/matlab-sonyalpha#connecting-the-camera"
 
 
 
+
       the Camera</h2>
     <p style="box-sizing: border-box; margin-top: 0px; margin-bottom:
       16px; color: rgb(36, 41, 46); font-family: -apple-system,
@@ -254,7 +263,19 @@ href="https://github.com/farhi/matlab-sonyalpha#connecting-the-camera"
       normal; orphans: 2; text-align: start; text-indent: 0px;
       text-transform: none; white-space: normal; widows: 2;
       word-spacing: 0px; -webkit-text-stroke-width: 0px;
+      text-decoration-style: initial; text-decoration-color: initial;"><b>WIFI</b></p>
+    <p style="box-sizing: border-box; margin-top: 0px; margin-bottom:
+      16px; color: rgb(36, 41, 46); font-family: -apple-system,
+      BlinkMacSystemFont, &quot;Segoe UI&quot;, Helvetica, Arial,
+      sans-serif, &quot;Apple Color Emoji&quot;, &quot;Segoe UI
+      Emoji&quot;, &quot;Segoe UI Symbol&quot;; font-size: 16px;
+      font-style: normal; font-variant-ligatures: normal;
+      font-variant-caps: normal; font-weight: 400; letter-spacing:
+      normal; orphans: 2; text-align: start; text-indent: 0px;
+      text-transform: none; white-space: normal; widows: 2;
+      word-spacing: 0px; -webkit-text-stroke-width: 0px;
       text-decoration-style: initial; text-decoration-color: initial;">Start
+
 
 
 
@@ -277,6 +298,7 @@ href="https://github.com/farhi/matlab-sonyalpha#connecting-the-camera"
 
 
 
+
       connection must be a dedicated ad-hoc, e.g. can<span>&nbsp;</span><em
         style="box-sizing: border-box;">NOT</em><span>&nbsp;</span>use
       an intermediate router. If you are already connected to the
@@ -294,6 +316,7 @@ href="https://github.com/farhi/matlab-sonyalpha#connecting-the-camera"
       text-transform: none; white-space: normal; widows: 2;
       word-spacing: 0px; -webkit-text-stroke-width: 0px;
       text-decoration-style: initial; text-decoration-color: initial;">If
+
       you need to specify the camera IP, use:</p>
     <p style="box-sizing: border-box; margin-top: 0px; margin-bottom:
       16px; color: rgb(36, 41, 46); font-family: -apple-system,
@@ -321,6 +344,20 @@ href="https://github.com/farhi/matlab-sonyalpha#connecting-the-camera"
       initial;">
       <pre style="box-sizing: border-box; font-family: SFMono-Regular, Consolas, &quot;Liberation Mono&quot;, Menlo, Courier, monospace; font-size: 13.6px; margin-top: 0px; margin-bottom: 0px; word-wrap: normal; padding: 16px; overflow: auto; line-height: 1.45; background-color: rgb(246, 248, 250); border-radius: 3px; word-break: normal;">&gt;&gt; camera = sonyalpha('http://192.168.122.1:8080');</pre>
     </div>
+    <p style="box-sizing: border-box; margin-top: 0px; margin-bottom:
+      16px; color: rgb(36, 41, 46); font-family: -apple-system,
+      BlinkMacSystemFont, &quot;Segoe UI&quot;, Helvetica, Arial,
+      sans-serif, &quot;Apple Color Emoji&quot;, &quot;Segoe UI
+      Emoji&quot;, &quot;Segoe UI Symbol&quot;; font-size: 16px;
+      font-style: normal; font-variant-ligatures: normal;
+      font-variant-caps: normal; font-weight: 400; letter-spacing:
+      normal; orphans: 2; text-align: start; text-indent: 0px;
+      text-transform: none; white-space: normal; widows: 2;
+      word-spacing: 0px; -webkit-text-stroke-width: 0px;
+      text-decoration-style: initial; text-decoration-color: initial;"><b>USB</b></p>
+    Alternatively, your can connect the camera with a USB cable. The
+    gphoto2 library will then be used (must be installed - see
+    http://www.gphoto.org/). Set the USB camera in 'PC remote' mode.<br>
     <h2 style="box-sizing: border-box; margin-top: 24px; margin-bottom:
       16px; font-size: 1.5em; font-weight: 600; line-height: 1.25;
       padding-bottom: 0.3em; border-bottom: 1px solid rgb(234, 236,
@@ -347,6 +384,7 @@ href="https://github.com/farhi/matlab-sonyalpha#using-the-plot-window"
             1.22 2 2.5S13.98 12 13 12H9c-.98 0-2-1.22-2-2.5
             0-.83.42-1.64 1-2.09V6.25c-1.09.53-2 1.84-2 3.25C6 11.31
             7.55 13 9 13h4c1.45 0 3-1.69 3-3.5S14.5 6 13 6z"></path></svg></a>Using
+
 
 
 
@@ -388,6 +426,7 @@ href="https://github.com/farhi/matlab-sonyalpha/blob/master/doc/SonyAlpha_image.
 
 
 
+
       <b>View</b> menu allows to add Pointers and Marks on top of the
       current image. These can be used for e.g. alignment. You can
       equally add Pointers directly right-clicking on the image.<br>
@@ -406,6 +445,7 @@ href="https://github.com/farhi/matlab-sonyalpha/blob/master/doc/SonyAlpha_image.
 
 
 
+
       <b>Settings</b> menu allows to change the most important camera
       settings, including the zoom level (when available).</p>
     <p style="box-sizing: border-box; margin-top: 0px; margin-bottom:
@@ -419,6 +459,7 @@ href="https://github.com/farhi/matlab-sonyalpha/blob/master/doc/SonyAlpha_image.
       text-transform: none; white-space: normal; widows: 2;
       word-spacing: 0px; -webkit-text-stroke-width: 0px;
       text-decoration-style: initial; text-decoration-color: initial;">The
+
 
 
 
@@ -464,20 +505,23 @@ href="https://github.com/farhi/matlab-sonyalpha#requirementsinstallation"
       widows: 2; word-spacing: 0px; -webkit-text-stroke-width: 0px;
       text-decoration-style: initial; text-decoration-color: initial;">
       <li style="box-sizing: border-box;">Matlab, no external toolbox</li>
-      <li style="box-sizing: border-box; margin-top: 0.25em;">A wifi
-        connection</li>
+      <li style="box-sizing: border-box; margin-top: 0.25em;">A wifi or
+        USB connection</li>
       <li style="box-sizing: border-box; margin-top: 0.25em;">A Sony
         Camera</li>
-      <li style="box-sizing: border-box; margin-top: 0.25em;">curl: Get
-        it at<span>&nbsp;</span><a href="https://curl.haxx.se/"
-          rel="nofollow" style="box-sizing: border-box;
-          background-color: transparent; color: rgb(3, 102, 214);
-          text-decoration: none;">https://curl.haxx.se/</a></li>
+      <li style="box-sizing: border-box; margin-top: 0.25em;">curl (for
+        wifi connection): Get it at<span>&nbsp;</span><a
+          href="https://curl.haxx.se/" rel="nofollow" style="box-sizing:
+          border-box; background-color: transparent; color: rgb(3, 102,
+          214); text-decoration: none;">https://curl.haxx.se/</a></li>
       <li style="box-sizing: border-box; margin-top: 0.25em;">ffmpeg
-        (for liveview): Get it at<span>&nbsp;</span><a
+        (for liveview with Wifi): Get it at<span>&nbsp;</span><a
           href="https://www.ffmpeg.org/" rel="nofollow"
           style="box-sizing: border-box; background-color: transparent;
           color: rgb(3, 102, 214); text-decoration: none;">https://www.ffmpeg.org/</a></li>
+      <li style="box-sizing: border-box; margin-top: 0.25em;">GPhoto2
+        (for usb connection). Get it at http://gphoto.org<br>
+      </li>
     </ul>
     <p style="box-sizing: border-box; margin-top: 0px; margin-bottom:
       16px; color: rgb(36, 41, 46); font-family: -apple-system,
@@ -490,6 +534,7 @@ href="https://github.com/farhi/matlab-sonyalpha#requirementsinstallation"
       text-transform: none; white-space: normal; widows: 2;
       word-spacing: 0px; -webkit-text-stroke-width: 0px;
       text-decoration-style: initial; text-decoration-color: initial;">Just
+
 
 
 
@@ -557,6 +602,7 @@ href="https://github.com/farhi/matlab-sonyalpha#requirementsinstallation"
       text-indent: 0px; text-transform: none; white-space: normal;
       widows: 2; word-spacing: 0px; -webkit-text-stroke-width: 0px;
       text-decoration-style: initial; text-decoration-color: initial;">(c)
+
 
 
 
