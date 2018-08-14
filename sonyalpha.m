@@ -55,7 +55,7 @@ classdef sonyalpha < handle
   %
   % Alternatively, your can connect the camera with a USB cable. The gphoto2 
   % library will then be used (must be installed - see http://www.gphoto.org/).
-  % Set the USB camera in 'PC remote' mode.
+  % Set the USB camera in 'PC remote' mode. GPhoto mode is rather slow.
   %
   % Using the Plot Window
   % ---------------------
@@ -526,9 +526,7 @@ classdef sonyalpha < handle
         % get the livestream URL e.g. 
         %   http://192.168.122.1:8080/liveview/liveviewstream
         url = self.api('startLiveview');
-        if any(strcmp(self.url, {'gphoto2','gphoto', 'usb'}))
-          disp(url);
-        else
+        if ~any(strcmp(self.url, {'gphoto2','gphoto', 'usb'}))
           if ischar(url) && ~isempty(self.ffmpeg)
             cmd = [ self.ffmpeg ' -ss 1 -i ' url ' -frames:v 1 ' filename ];
             if strcmp(self.updateTimer.Running,'on')
@@ -936,6 +934,7 @@ function plot_pointers(src, evnt, self, cmd)
   
   fig = self.figure;
   if ~ishandle(fig), return; end
+  set(0, 'CurrentFigure', fig);
   set(fig, 'HandleVisibility','on', 'NextPlot','add');
   
   for f={'SonyAlpha_Pointers','SonyAlpha_Line1','SonyAlpha_Line2','SonyAlpha_Info'}
@@ -1045,7 +1044,7 @@ function present = ffmpeg_check
   
   if isempty(present)
     disp([ mfilename ': WARNING: FFMPEG executable is not installed. Get it at https://www.ffmpeg.org/' ]);
-    disp('  The LiveView will be unactivated, but you can still take pictures.')
+    disp('  The LiveView may be unactivated, but you can still take pictures.')
   else
     disp([ '  FFMPEG          (https://www.ffmpeg.org/) as "' present '"' ]);
   end
@@ -1099,7 +1098,7 @@ function TimerCallback(src, evnt)
   % TimerCallback: update from timer event
   self = get(src, 'UserData');
   if isvalid(self), 
-    try; self.getstatus; end
+    try; self.getstatus; plot_pointers('','',self); end
   else delete(src); return; end
 
   % handle continuous shooting mode: do something when camera is IDLE

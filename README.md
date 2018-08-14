@@ -66,7 +66,7 @@ Connecting the Camera
 
   Alternatively, your can connect the camera with a USB cable. The gphoto2 
   library will then be used (must be installed - see http://www.gphoto.org/).
-  Set the USB camera in 'PC remote' mode.
+  Set the USB camera in 'PC remote' mode. GPhoto mode is rather slow.
   
 Using the Plot Window
 ---------------------

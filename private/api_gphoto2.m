@@ -171,7 +171,7 @@ function gphoto_config = gphoto2_getconfig(exe, config)
   elseif isunix, precmd = 'LD_LIBRARY_PATH= ;  DISPLAY= ; '; 
   else           precmd = ''; end
   
-  if nargin < 1, config = []; end
+  if nargin < 2, config = []; end
   if ~isempty(config)
     cmd = [ precmd exe ' -q ' ]; 
     % handle multiple config
@@ -231,10 +231,10 @@ function message = gphoto2_setconfig(exe, config, value, choices)
   elseif isunix, precmd = 'LD_LIBRARY_PATH= ;  DISPLAY= ; '; 
   else           precmd = ''; end
   
-  if nargin < 1, config = []; end
-  if nargin < 2, value  = [];  end
-  if nargin < 3, choices = [];  end
-  if isempty(configs) || isempty(values)
+  if nargin < 2, config = [];  end
+  if nargin < 3, value  = [];  end
+  if nargin < 4, choices = []; end
+  if isempty(config) || isempty(value)
     message = [];
     return;
   end
@@ -267,7 +267,7 @@ function filename = gphoto2_capture(exe, filename)
   elseif isunix, precmd = 'LD_LIBRARY_PATH= ;  DISPLAY= ; '; 
   else           precmd = ''; end
   
-  if nargin < 1, filename = []; end
+  if nargin < 2, filename = []; end
   if isempty(filename)
     p = tempname;
     mkdir(p);
@@ -318,6 +318,8 @@ function filename = gphoto2_capture(exe, filename)
 
 end % gphoto2_capture
 
+% ------------------------------------------------------------------------------
+
 function message = gphoto2_liveview(exe, self, filename)
 % gphoto2_liveview: capture a 'fast' image for live view
 
@@ -325,6 +327,9 @@ function message = gphoto2_liveview(exe, self, filename)
   if ismac,      precmd = 'DYLD_LIBRARY_PATH= ; DISPLAY= ; ';
   elseif isunix, precmd = 'LD_LIBRARY_PATH= ;  DISPLAY= ; '; 
   else           precmd = ''; end
+  
+  if nargin < 3, filename = ''; end
+  if isempty(filename), filename = fullfile(tempdir, 'LiveView.jpg'); end
   
   % get 'fast' settings, capture, and restore
   imagequality = findValueInChoices(self.imageQuality,        self.available.quality);
@@ -424,9 +429,12 @@ function status = gphoto2status(gphoto_config)
   
   status.gphoto = gphoto_config;
 end % gphoto2status
-        
+
+% ------------------------------------------------------------------------------
+
 function value = findValueInChoices(value, choices)
 % findValueInChoices: search for value in choices
+  if iscell(value), value = [ value{:} ]; end
   if ischar(value)
     val_num = str2num(value); 
     val_char= value;
@@ -435,7 +443,12 @@ function value = findValueInChoices(value, choices)
     val_num = value;
   end
   
-  val_char = strrep(val_char, '\"',''); % remove 'second' in char value
+  if any(val_char == '"') % shutter time
+    val_char = strrep(val_char, '\"',''); % remove 'second' in char value
+    val_char = strrep(val_char, '"',''); 
+    value    = str2num(val_char);
+  end
+
   % handle long name for modes
   switch val_char
   case 'Program Auto'; val_char = 'P';
@@ -470,6 +483,8 @@ function value = findValueInChoices(value, choices)
   end
 end % findValueInChoices
 
+% ------------------------------------------------------------------------------
+
 function g = gphoto_executable
   % search gphoto2 binary
   
@@ -488,7 +503,7 @@ function g = gphoto_executable
     if status == 0
         % the executable is there.
         g = try_target{1};
-        disp([ '  GPhoto found as: ' g ]);
+        disp([ '  GPhoto         (https://www.gphoto.org/) as: ' g ]);
         break
     end
   end
