@@ -117,6 +117,7 @@ classdef sonyalpha < handle
     available     = struct();
     version       = '2.40';
     liveview      = true;
+    lastImage     = [];
     UserData      = [];
   end % properties
   
@@ -244,7 +245,7 @@ classdef sonyalpha < handle
             message = strrep(message, '\/','/');
             message = loadjson(message); % We use JSONlab reader which is more robust
           end
-        catch
+        catch ME
           disp(cmd)
           disp(message)
           disp([ mfilename ': Invalid JSON result. Perhaps the connection failed ?' ])
@@ -389,6 +390,7 @@ classdef sonyalpha < handle
         self.start; % try to start the camera
         disp([ mfilename ': camera is not ready.' ]);
       end
+      self.lastImage = url;
     end % urlread
     
     function [im,url,info] = urlwrite(self, filename)
@@ -414,6 +416,7 @@ classdef sonyalpha < handle
           disp(url{index})
           try
             info{end+1} = imfinfo(url{index});
+            info{end}.url = url{index};
           catch
             info{end+1} =  [];
           end
@@ -423,12 +426,13 @@ classdef sonyalpha < handle
             im{end+1}   = [];
           end
         end
+        self.lastImage = im{end};
       else % wifi API: download images
       
         [p, f, ext] = fileparts(url);
           
         if isempty(filename)
-          filename = [ f e ]; % saves locally using the distant image name
+          filename = fullfile(tempdir, [ f ext ]); % saves locally using the distant image name
         else
           % check extension
           [p,f,E] = fileparts(filename);
@@ -436,21 +440,21 @@ classdef sonyalpha < handle
         end
         % then get URL and display it
         im   = urlwrite(url, filename);
-        info = imfinfo(filename);
+        info = imfinfo(filename); % contains actual local image FileName
+        info.url = url; % distant location
+        self.lastImage = im;
+      end
+      % save the LiveView.jpg image to show in the plot window
+      if ~isempty(self.lastImage)
+        if ischar(self.lastImage) && exist(self.lastImage)
+          copyfile(self.lastImage, fullfile(tempdir, 'LiveView.jpg'));
+          self.lastImage = imread(self.lastImage);
+        elseif isnumeric(self.lastImage)
+          imwrite(self.lastImage, fullfile(tempdir, 'LiveView.jpg'));
+        end
+        
       end
     end % urlwrite
-    
-    function urldelete(self, filename)
-      % delete files from the camera using the following sequence of calls:
-      % 
-      %  setCameraFunction to "Contents Transfer"
-      %  getSourceList to get storage location
-      %  getContentCount to get count of files
-      %  getContentList to get list of files on camera
-      %  parse content list to get file URI's
-      %  deleteContent to delete each file
-      curl(self, 'getCameraFunction', 'avContent');
-    end % urldelete
     
     function [im, exif] = imread(self)
       % imread: take a picture, read it as an RGB matrix, and delete any local file.
@@ -462,11 +466,18 @@ classdef sonyalpha < handle
       % The resulting image is the 'postview' one, e.g. 2M pixels. The original
       % image remains on the camera. In GPhoto mode, the files are
       % the full images.
-      [im,url,exif] = urlwrite(self, tempname);
-      if ~iscellstr(url), url = cellstr(url); end
-      for index=1:numel(url)
-        try; delete(url{index}); end
+      [im,url,exif] = urlwrite(self);
+      if  ischar(im),   im   = cellstr(im); end
+      if ~iscell(exif), exif = { exif }; end
+      for index=1:numel(im)
+        if ischar(im{index}), im{index} = imread(im{index}); end
+        if isfield(exif{index}, 'Filename') && exist(exif{index}.Filename,'file')
+          delete(exif{index}.Filename);   
+        end
       end
+      if numel(im) == 1,   im   = im{1}; end
+      if numel(exif) == 1, exif = exif{1}; end
+      if iscell(url) && numel(url) == 1,  url  = url{1}; end
      
     end % imread
     
@@ -483,16 +494,8 @@ classdef sonyalpha < handle
       
       [im, exif] = imread(self);
       fig        = plot_window(self);
-      if iscell(im)
-        im = im{end};
-      end
-      try
       h          = image(im); axis tight;
-      catch
-      whos im;
-      end
-      % save the LiveView.jpg image to show in the plot window
-      imwrite(im, fullfile(tempdir, 'LiveView.jpg'));
+      if isfield(exif, 'Filename') title(exif.Filename, 'Interpreter','none'); end
       set(h, 'ButtonDownFcn',        {@ButtonDownCallback, self}, ...
         'Tag', 'SonyAlpha_Image');
       set(fig, 'HandleVisibility','off', 'NextPlot','new');
@@ -518,7 +521,9 @@ classdef sonyalpha < handle
       % check for SonyAlpha viewer
       
       h = [];
-      if isempty(self.ffmpeg), return; end
+      if isempty(self.ffmpeg)
+        return; % ffmpeg not available, no liveview
+      end
       
       % start the LiveView mode and get a frame
       filename = fullfile(tempdir, 'LiveView.jpg');
@@ -906,7 +911,7 @@ function h = plot_window(self)
     m0 = uimenu(h, 'Label', 'Shoot');
     uimenu(m0, 'Label', 'Update Live-View', 'Accelerator','u', ...
       'Callback', {@MenuCallback, 'plot', self });
-    uimenu(m0, 'Label', 'Reset', 'Accelerator','u', ...
+    uimenu(m0, 'Label', 'Reset', 'Accelerator','r', ...
       'Callback', {@MenuCallback, 'start', self });
     labs = { 'Single',                    'image'; ...
              'Continuous Start/Stop',     'continuous'; ...
