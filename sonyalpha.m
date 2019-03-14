@@ -606,7 +606,10 @@ classdef sonyalpha < handle
       end
       if ~strcmp(self.cameraStatus, 'IDLE')
         fprintf(1,'%s = %s [%s] BUSY\n',iname, id, char(self));
-      else fprintf(1,'%s = %s [%s] %s\n',iname, id, char(self), self.lastImageURL);
+      elseif ~isempty(self.lastImageURL) 
+        fprintf(1,'%s = %s [%s] %s\n',iname, id, char(self), self.lastImageURL);
+      else
+        fprintf(1,'%s = %s [%s]\n',iname, id, char(self));
       end
     end % display
     
@@ -621,11 +624,11 @@ classdef sonyalpha < handle
       if isdeployed || ~usejava('jvm') || ~usejava('desktop') || nargin > 2, id=class(self);
       else id=[  '<a href="matlab:doc ' class(self) '">' class(self) '</a> ' ...
                  '(<a href="matlab:methods ' class(self) '">methods</a>,' ...
-                 '<a href="matlab:image(' iname ');">shoot</a>' ];
+                 '<a href="matlab:image(' iname ');">shoot</a>)' ];
       end
       if ~strcmp(self.cameraStatus, 'IDLE')
-        fprintf(1,'%s = %s BUSY\n',iname, id, char(self));
-      else fprintf(1,'%s = %s %s\n',iname, id, char(self), self.lastImageURL);
+        fprintf(1,'%s = %s [%s] BUSY\n',iname, id, char(self));
+      else fprintf(1,'%s = %s [%s] \n',iname, id, char(self));
       end
       % display settings
       items = {'exposureMode','cameraStatus','selfTimer','zoomPosition', ...
@@ -634,7 +637,10 @@ classdef sonyalpha < handle
       c = { };
       for f=items
         val = num2str(self.(f{1}));
-        disp(sprintf('%15s = %s', f{1}, val));
+        fprintf(1, '%15s = %s\n', f{1}, val);
+      end
+      if ~isempty(self.lastImageURL)
+        disp([ 'Last image: ' self.lastImageURL ])
       end
     end
       
@@ -1011,7 +1017,7 @@ function plot_pointers(src, evnt, self, cmd)
   % plot pointers and marks
   
   fig = self.figure;
-  if ~ishandle(fig), return; end
+  if ~ishandle(fig) || isempty(fig), return; end
   set(0, 'CurrentFigure', fig);
   set(fig, 'HandleVisibility','on', 'NextPlot','add');
   
