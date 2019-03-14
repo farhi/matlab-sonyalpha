@@ -118,6 +118,7 @@ classdef sonyalpha < handle
     version       = '2.40';
     liveview      = true;
     lastImage     = [];
+    lastImageURL  = [];
     UserData      = [];
   end % properties
   
@@ -390,7 +391,8 @@ classdef sonyalpha < handle
         self.start; % try to start the camera
         disp([ mfilename ': camera is not ready.' ]);
       end
-      self.lastImage = url;
+      self.lastImage    = url;
+      self.lastImageURL = url;
     end % urlread
     
     function [im,url,info] = urlwrite(self, filename)
@@ -426,13 +428,27 @@ classdef sonyalpha < handle
             im{end+1}   = [];
           end
         end
-        self.lastImage = im{end};
+        self.lastImage    = im{end};
+        self.lastImageURL = url{end};
+        % image has already been saved locally by gphoto2
+        % copy to an other specified location ?
+        [p,f,ext] = fileparts(url{end});
+        if ~isempty(filename) && isdir(filename) && ~strcmp(p, filename)
+          copyfile(url{end}, fullfile(filename, [f ext]));
+        elseif ~isempty(filename)
+          % check extension
+          [p,f,E] = fileparts(filename);
+          if isempty(E), filename = [ filename ext ]; end
+          copyfile(url{end}, filename);
+        end
       else % wifi API: download images
       
         [p, f, ext] = fileparts(url);
           
         if isempty(filename)
           filename = fullfile(tempdir, [ f ext ]); % saves locally using the distant image name
+        elseif isdir(filename)
+          filename = fullfile(filename, [ f ext ]);
         else
           % check extension
           [p,f,E] = fileparts(filename);
@@ -442,7 +458,8 @@ classdef sonyalpha < handle
         im   = urlwrite(url, filename);
         info = imfinfo(filename); % contains actual local image FileName
         info.url = url; % distant location
-        self.lastImage = im;
+        self.lastImage    = im;
+        self.lastImageURL = url;
       end
       % save the LiveView.jpg image to show in the plot window
       if ~isempty(self.lastImage)
@@ -452,7 +469,6 @@ classdef sonyalpha < handle
         elseif isnumeric(self.lastImage)
           imwrite(self.lastImage, fullfile(tempdir, 'LiveView.jpg'));
         end
-        
       end
     end % urlwrite
     
@@ -565,6 +581,63 @@ classdef sonyalpha < handle
       end
       
     end % plot
+    
+    function settings = char(self)
+      wb = strtok(self.whiteBalance); if numel(wb)> 4, wb=wb(1:4); end
+      settings = sprintf('%s F%s EV%d ISO %s %s Foc:%.2f', ...
+        num2str(self.shutterSpeed), num2str(self.fNumber), ...
+        num2str(self.exposureCompensation), ...
+        num2str(self.isoSpeedRate), wb, self.int);
+    end
+    
+    function display(self)
+      % display(s) display SonyAlpha object (short)
+      
+      if ~isempty(inputname(1))
+        iname = inputname(1);
+      else
+        iname = 'ans';
+      end
+      if isdeployed || ~usejava('jvm') || ~usejava('desktop') || nargin > 2, id=class(self);
+      else id=[  '<a href="matlab:doc ' class(self) '">' class(self) '</a> ' ...
+                 '(<a href="matlab:methods ' class(self) '">methods</a>,' ...
+                 '<a href="matlab:image(' iname ');">shoot</a>,' ...
+                 '<a href="matlab:disp(' iname ');">more...</a>)' ];
+      end
+      if ~strcmp(self.cameraStatus, 'IDLE')
+        fprintf(1,'%s = %s [%s] BUSY\n',iname, id, char(self));
+      else fprintf(1,'%s = %s [%s] %s\n',iname, id, char(self), self.lastImageURL);
+      end
+    end % display
+    
+    function disp(self)
+      % disp(s) display SonyAlpha object (details)
+      
+      if ~isempty(inputname(1))
+        iname = inputname(1);
+      else
+        iname = 'ans';
+      end
+      if isdeployed || ~usejava('jvm') || ~usejava('desktop') || nargin > 2, id=class(self);
+      else id=[  '<a href="matlab:doc ' class(self) '">' class(self) '</a> ' ...
+                 '(<a href="matlab:methods ' class(self) '">methods</a>,' ...
+                 '<a href="matlab:image(' iname ');">shoot</a>' ];
+      end
+      if ~strcmp(self.cameraStatus, 'IDLE')
+        fprintf(1,'%s = %s BUSY\n',iname, id, char(self));
+      else fprintf(1,'%s = %s %s\n',iname, id, char(self), self.lastImageURL);
+      end
+      % display settings
+      items = {'exposureMode','cameraStatus','selfTimer','zoomPosition', ...
+        'shootMode','exposureCompensation','fNumber','focusMode', ...
+        'isoSpeedRate','shutterSpeed','whiteBalance' };
+      c = { };
+      for f=items
+        val = num2str(self.(f{1}));
+        disp(sprintf('%15s = %s', f{1}, val));
+      end
+    end
+      
     
     function about(self)
       % about: display camera settings
@@ -996,12 +1069,7 @@ function plot_pointers(src, evnt, self, cmd)
   end
   
   % now display the shutter F exp ISO
-  wb = strtok(self.whiteBalance); if numel(wb)> 4, wb=wb(1:4); end
-  settings = sprintf('%s F%s EV%d ISO %s %s Foc:%.2f', ...
-    num2str(self.shutterSpeed), num2str(self.fNumber), ...
-    num2str(self.exposureCompensation), ...
-    num2str(self.isoSpeedRate), wb, self.int);
-  t = text(0.05*max(xl), .95*max(yl), settings);
+  t = text(0.05*max(xl), .95*max(yl), char(self));
   set(t,'Color', 'y', 'FontSize', 18, 'Tag', 'SonyAlpha_Info');
 
   set(fig, 'HandleVisibility','off', 'NextPlot','new');
