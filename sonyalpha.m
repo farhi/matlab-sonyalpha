@@ -598,7 +598,7 @@ classdef sonyalpha < handle
       else
         iname = 'ans';
       end
-      if isdeployed || ~usejava('jvm') || ~usejava('desktop') || nargin > 2, id=class(self);
+      if isdeployed || ~usejava('jvm') || ~usejava('desktop'), id=class(self);
       else id=[  '<a href="matlab:doc ' class(self) '">' class(self) '</a> ' ...
                  '(<a href="matlab:methods ' class(self) '">methods</a>,' ...
                  '<a href="matlab:image(' iname ');">shoot</a>,' ...
@@ -607,7 +607,11 @@ classdef sonyalpha < handle
       if ~strcmp(self.cameraStatus, 'IDLE')
         fprintf(1,'%s = %s [%s] BUSY\n',iname, id, char(self));
       elseif ~isempty(self.lastImageURL) 
-        fprintf(1,'%s = %s [%s] %s\n',iname, id, char(self), self.lastImageURL);
+        if isdeployed || ~usejava('jvm') || ~usejava('desktop')
+          fprintf(1,'%s = %s [%s] %s\n',iname, id, char(self), self.lastImageURL);
+        else
+          fprintf(1,'%s = %s [%s] <a href="%s">%s</a>\n',iname, id, char(self), self.lastImageURL,self.lastImageURL);
+        end
       else
         fprintf(1,'%s = %s [%s]\n',iname, id, char(self));
       end
@@ -621,7 +625,7 @@ classdef sonyalpha < handle
       else
         iname = 'ans';
       end
-      if isdeployed || ~usejava('jvm') || ~usejava('desktop') || nargin > 2, id=class(self);
+      if isdeployed || ~usejava('jvm') || ~usejava('desktop'), id=class(self);
       else id=[  '<a href="matlab:doc ' class(self) '">' class(self) '</a> ' ...
                  '(<a href="matlab:methods ' class(self) '">methods</a>,' ...
                  '<a href="matlab:image(' iname ');">shoot</a>)' ];
@@ -640,7 +644,11 @@ classdef sonyalpha < handle
         fprintf(1, '%15s = %s\n', f{1}, val);
       end
       if ~isempty(self.lastImageURL)
-        disp([ 'Last image: ' self.lastImageURL ])
+        if isdeployed || ~usejava('jvm') || ~usejava('desktop')
+          fprintf(1,'  Last Image: s\n', self.lastImageURL);
+        else
+          fprintf(1,'  Last Image: <a href="%s">%s</a>\n', self.lastImageURL,self.lastImageURL);
+        end
       end
     end
       
