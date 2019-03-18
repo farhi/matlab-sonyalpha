@@ -136,6 +136,10 @@ classdef sonyalpha < handle
     show_lines = false;
     ffmpeg   = [];
     period   = 2.0;
+    
+    jsonFile = [];
+    json     = [];
+    
 
   end % properties
   
@@ -212,9 +216,6 @@ classdef sonyalpha < handle
     % main communication method (low-level)
     function message = curl(self, post, target)
       % prepare curl command
-      if ismac,      precmd = 'DYLD_LIBRARY_PATH= ;';
-      elseif isunix, precmd = 'LD_LIBRARY_PATH= ; '; 
-      else           precmd=''; end
       
       if nargin < 3, target = 'camera'; end
       
@@ -222,6 +223,10 @@ classdef sonyalpha < handle
         cmd = post;
         [ret, message, self] = api_gphoto2(self, post, target);
       else
+        if ismac,      precmd = 'DYLD_LIBRARY_PATH= ;';
+        elseif isunix, precmd = 'LD_LIBRARY_PATH= ; '; 
+        else           precmd=''; end
+        
         url = fullfile(self.url, 'sony', target);
         
         cmd = [ 'curl -d ''' post ''' ' url ];
@@ -229,6 +234,7 @@ classdef sonyalpha < handle
         % evaluate command
         [ret, message]=system([ precmd  cmd ]);
       end
+      if isempty(self.jsonFile) self.json = message; end
       
       if ret % error
         disp(cmd)
@@ -237,36 +243,34 @@ classdef sonyalpha < handle
         error(message);
       end
       
-      % decode JSON output into struct
-      if ~any(strcmp(self.url, {'gphoto2','gphoto', 'usb'}))
-        try
-          if ~isempty(message)
-            index = isstrprop(message, 'print');
-            message = message(index);
-            message = strrep(message, '\/','/');
-            message = loadjson(message); % We use JSONlab reader which is more robust
-          end
-        catch ME
-          disp(cmd)
-          disp(message)
-          disp([ mfilename ': Invalid JSON result. Perhaps the connection failed ?' ])
-        end
+      message = curl_read_json(self, message); % into struct
+    end % curl
+    
+    function capture(self)
+      % capture get a image (background capture)
+      
+      if ~strcmp(self.cameraStatus, 'IDLE') % BUSY
+        return
       end
 
-      if isstruct(message) && isfield(message, 'result') && ischar(message.result)
-        message.result = strrep(message.result', '\/','/');
-      end
-      if isstruct(message) && numel(fieldnames(message)) == 2
-        if  isfield(message, 'result')
-          message = message.result;
-        elseif isfield(message, 'error')
-          message = message.error;
+      if any(strcmp(self.url, {'gphoto2','gphoto', 'usb'}))
+        error([ mfilename ': asynchronous capture only available in wifi mode' ])
+      else
+        url       = fullfile(self.url, 'sony', 'camera');
+        self.jsonFile = [ tempname '.json' ];
+        json = '{"method": "actTakePicture","params": [],"id": 1,"version": "1.0"}';
+        cmd = [ 'curl -o ' self.jsonFile ' -d ''' json ''' ' url ];
+        
+        % launch an asynchronous command. Java does not work.
+        disp(cmd)
+        if ispc
+          system([ 'start /b ' cmd ]);
+        else
+          system([ cmd ' &' ]);
         end
       end
-      if iscell(message) && numel(message) == 1
-        message = message{1};
-      end
-    end % curl
+      
+    end
     
     % INFO stuff
     function status = getstatus(self)
@@ -319,7 +323,8 @@ classdef sonyalpha < handle
       % api('method', param): call the given API method call (with argument)
       % api(..., service):    call the given API method call, for the API service.
       %    Default is service='camera'. Other choice is 'avContent'.
-      if nargin < 4, service='camera'; end
+      if nargin < 4, service=''; end
+      if isempty(service), service='camera'; end
       if nargin < 3 || isempty(value)
         json = [ '{"method": "' method '","params": [],"id": 1,"version": "1.0"}' ];
       else
@@ -384,6 +389,11 @@ classdef sonyalpha < handle
       % Must have used 'start' before (e.g. at init).
       % The resulting image is the 'postview' one, e.g. 2M pixels. The original
       % image remains on the camera.
+      if ~strcmp(self.cameraStatus, 'IDLE') % BUSY
+        url = [];
+        return
+      end
+      
       url = self.api('actTakePicture');
       if iscellstr(url)
         url = char(url); % ok
@@ -409,7 +419,9 @@ classdef sonyalpha < handle
       if nargin < 2, filename = ''; end
       
       % get the URL and its extension
+      im=[]; info=[];
       url = self.urlread;
+      if isempty(url), return; end % BUSY
       
       if any(strcmp(self.url, {'gphoto2','gphoto', 'usb'}))
         % for gphoto, we just read the images and return
@@ -442,7 +454,10 @@ classdef sonyalpha < handle
           copyfile(url{end}, filename);
         end
       else % wifi API: download images
-      
+        if ~isempty(url) && (~ischar(url) || ~exist(url, 'file'))
+          disp(url)
+          return
+        end
         [p, f, ext] = fileparts(url);
           
         if isempty(filename)
@@ -483,6 +498,7 @@ classdef sonyalpha < handle
       % image remains on the camera. In GPhoto mode, the files are
       % the full images.
       [im,url,exif] = urlwrite(self);
+      if isempty(im), return; end % BUSY
       if  ischar(im),   im   = cellstr(im); end
       if ~iscell(exif), exif = { exif }; end
       for index=1:numel(im)
@@ -509,6 +525,7 @@ classdef sonyalpha < handle
       % the full images.
       
       [im, exif] = imread(self);
+      if isempty(im), h=[]; return; end % BUSY
       fig        = plot_window(self);
       h          = image(im); axis tight;
       if isfield(exif, 'Filename') title(exif.Filename, 'Interpreter','none'); end
@@ -584,7 +601,8 @@ classdef sonyalpha < handle
     
     function settings = char(self)
       wb = strtok(self.whiteBalance); if numel(wb)> 4, wb=wb(1:4); end
-      settings = sprintf('%s F%s EV%d ISO %s %s Foc:%.2f', ...
+      settings = sprintf('%s %s F%s EV%d ISO %s %s Foc:%.2f', ...
+        self.exposureMode, ...
         num2str(self.shutterSpeed), num2str(self.fNumber), ...
         num2str(self.exposureCompensation), ...
         num2str(self.isoSpeedRate), wb, self.int);
@@ -913,7 +931,43 @@ classdef sonyalpha < handle
   
 end % sonyalpha class
 
+function message=curl_read_json(self, message)
+  try
+  if ~isempty(dir(message))
+    message = fileread(message)
+  end
+  end
+  
+  % decode JSON output into struct
+  if ~any(strcmp(self.url, {'gphoto2','gphoto', 'usb'}))
+    try
+      if ~isempty(message)
+        index = isstrprop(message, 'print');
+        message = message(index);
+        message = strrep(message, '\/','/');
+        message = loadjson(message); % We use JSONlab reader which is more robust
+      end
+    catch ME
+      disp(message)
+      disp([ mfilename ': Invalid JSON result. Perhaps the connection failed ?' ])
+    end
+  end
 
+  if isstruct(message) && isfield(message, 'result') && ischar(message.result)
+    message.result = strrep(message.result', '\/','/');
+  end
+  if isstruct(message) && numel(fieldnames(message)) == 2
+    if  isfield(message, 'result')
+      message = message.result;
+    elseif isfield(message, 'error')
+      message = message.error;
+    end
+  end
+  if iscell(message) && numel(message) == 1
+    message = message{1};
+  end
+  
+end % curl_read_json
 
 % simple interface build: show current live-view/last image, and
 % camera set-up menu.
@@ -1084,7 +1138,11 @@ function plot_pointers(src, evnt, self, cmd)
   
   % now display the shutter F exp ISO
   t = text(0.05*max(xl), .95*max(yl), char(self));
-  set(t,'Color', 'y', 'FontSize', 18, 'Tag', 'SonyAlpha_Info');
+  if ~strcmp(self.cameraStatus, 'IDLE') % BUSY
+    set(t,'Color', 'r', 'FontSize', 18, 'Tag', 'SonyAlpha_Info');
+  else
+    set(t,'Color', 'y', 'FontSize', 18, 'Tag', 'SonyAlpha_Info');
+  end
 
   set(fig, 'HandleVisibility','off', 'NextPlot','new');
   
@@ -1194,6 +1252,19 @@ function TimerCallback(src, evnt)
       self.timelapse_clock     = clock;
       url = self.urlread;
       disp([ mfilename ': [' datestr(now) '] image ' url ]);
+    end
+  end
+  
+  % check if a background command is running. Is it finished ?
+  % check if any astrometry job is running
+  % we read the json result
+  if ~isempty(self.jsonFile) && ~isempty(dir(self.jsonFile))
+    File = fileread(self.jsonFile);
+    if ~isempty(File)
+      disp([ mfilename ': [' datestr(now) ']: background capture ended.' ]);
+      self.json = curl_read_json(self, File);
+      disp(self.json)
+      self.jsonFile = [];
     end
   end
 
