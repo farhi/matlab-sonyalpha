@@ -233,6 +233,7 @@ classdef sonyalpha < handle
         
         % evaluate command
         [ret, message]=system([ precmd  cmd ]);
+        message = curl_read_json(self, message); % into struct
       end
       if isempty(self.jsonFile) self.json = message; end
       
@@ -243,7 +244,7 @@ classdef sonyalpha < handle
         error(message);
       end
       
-      message = curl_read_json(self, message); % into struct
+      
     end % curl
     
     function capture(self)
@@ -503,9 +504,16 @@ classdef sonyalpha < handle
       if ~iscell(exif), exif = { exif }; end
       for index=1:numel(im)
         if ischar(im{index}), im{index} = imread(im{index}); end
-        if isfield(exif{index}, 'Filename') && exist(exif{index}.Filename,'file')
-          delete(exif{index}.Filename);   
+        
+        if isfield(exif{index}, 'Filename') 
+          filename = exif{index}.Filename;
+          if ~isempty(dir(filename))
+            delete(filename);   
+          end
         end
+      end
+      if iscell(im)
+        im = im(~cellfun(@isempty, im));
       end
       if numel(im) == 1,   im   = im{1}; end
       if numel(exif) == 1, exif = exif{1}; end
