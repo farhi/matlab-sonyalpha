@@ -247,23 +247,25 @@ classdef sonyalpha < handle
       
     end % curl
     
-    function capture(self)
+    function capture(self, action)
       % capture get a image (background capture)
-      
-      if ~strcmp(self.cameraStatus, 'IDLE') % BUSY
+      % 
+      % capture(self, 'awaitTakePicture') wait for end of capture (long exposure)
+      if nargin < 2, action=''; end
+      if isempty(action) && ~strcmp(self.cameraStatus, 'IDLE') % BUSY
         return
       end
+      if isempty(action), action = 'actTakePicture'; end
 
       if any(strcmp(self.url, {'gphoto2','gphoto', 'usb'}))
         error([ mfilename ': asynchronous capture only available in wifi mode' ])
       else
         url       = fullfile(self.url, 'sony', 'camera');
         self.jsonFile = [ tempname '.json' ];
-        json = '{"method": "actTakePicture","params": [],"id": 1,"version": "1.0"}';
+        json = [ '{"method": "' action '","params": [],"id": 1,"version": "1.0"}' ];
         cmd = [ 'curl -o ' self.jsonFile ' -d ''' json ''' ' url ];
         
         % launch an asynchronous command. Java does not work.
-        disp(cmd)
         if ispc
           system([ 'start /b ' cmd ]);
         else
@@ -396,14 +398,26 @@ classdef sonyalpha < handle
       end
       
       url = self.api('actTakePicture');
+      % in case result is error 40403 "Long Exposure" "Still Capturing Not Finished"
+      % then re-send self.api('awaitTakePicture') until we obtain a result with URL.
+      waitme = true;
+      while waitme
+        if iscell(url) && isnumeric(url{1}) && isequal(url{1}, 40403)
+          plot_pointers('','',self); % set display to BUSY
+          drawnow
+          url = self.api('awaitTakePicture');
+        else
+          waitme = false;
+        end
+      end
       if iscellstr(url)
         url = char(url); % ok
+        self.lastImage    = url;
+        self.lastImageURL = url;
       else
         self.start; % try to start the camera
         disp([ mfilename ': camera is not ready.' ]);
       end
-      self.lastImage    = url;
-      self.lastImageURL = url;
     end % urlread
     
     function [im,url,info] = urlwrite(self, filename)
@@ -455,7 +469,7 @@ classdef sonyalpha < handle
           copyfile(url{end}, filename);
         end
       else % wifi API: download images
-        if ~isempty(url) && (~ischar(url) || ~exist(url, 'file'))
+        if ~isempty(url) && ~ischar(url)
           disp(url)
           return
         end
@@ -614,6 +628,9 @@ classdef sonyalpha < handle
         num2str(self.shutterSpeed), num2str(self.fNumber), ...
         num2str(self.exposureCompensation), ...
         num2str(self.isoSpeedRate), wb, self.int);
+      if ~strcmp(self.cameraStatus, 'IDLE')
+        settings = [ settings ' BUSY' ];
+      end
     end
     
     function display(self)
@@ -630,9 +647,7 @@ classdef sonyalpha < handle
                  '<a href="matlab:image(' iname ');">shoot</a>,' ...
                  '<a href="matlab:disp(' iname ');">more...</a>)' ];
       end
-      if ~strcmp(self.cameraStatus, 'IDLE')
-        fprintf(1,'%s = %s [%s] BUSY\n',iname, id, char(self));
-      elseif ~isempty(self.lastImageURL) 
+      if ~isempty(self.lastImageURL) 
         if isdeployed || ~usejava('jvm') || ~usejava('desktop')
           fprintf(1,'%s = %s [%s] %s\n',iname, id, char(self), self.lastImageURL);
         else
@@ -656,10 +671,7 @@ classdef sonyalpha < handle
                  '(<a href="matlab:methods ' class(self) '">methods</a>,' ...
                  '<a href="matlab:image(' iname ');">shoot</a>)' ];
       end
-      if ~strcmp(self.cameraStatus, 'IDLE')
-        fprintf(1,'%s = %s [%s] BUSY\n',iname, id, char(self));
-      else fprintf(1,'%s = %s [%s] \n',iname, id, char(self));
-      end
+      fprintf(1,'%s = %s [%s] \n',iname, id, char(self));
       % display settings
       items = {'exposureMode','cameraStatus','selfTimer','zoomPosition', ...
         'shootMode','exposureCompensation','fNumber','focusMode', ...
@@ -1253,26 +1265,30 @@ function TimerCallback(src, evnt)
   if isvalid(self), 
     try; self.getstatus; plot_pointers('','',self); end
   else delete(src); return; end
-
-  % handle continuous shooting mode: do something when camera is IDLE
-  if strcmpi(self.cameraStatus,'IDLE')
-    if any(self.timelapse_clock) && etime(clock, self.timelapse_clock) > self.timelapse_interval
-      self.timelapse_clock     = clock;
-      url = self.urlread;
-      disp([ mfilename ': [' datestr(now) '] image ' url ]);
-    end
-  end
   
   % check if a background command is running. Is it finished ?
-  % check if any astrometry job is running
   % we read the json result
   if ~isempty(self.jsonFile) && ~isempty(dir(self.jsonFile))
     File = fileread(self.jsonFile);
     if ~isempty(File)
-      disp([ mfilename ': [' datestr(now) ']: background capture ended.' ]);
-      self.json = curl_read_json(self, File);
-      disp(self.json)
-      self.jsonFile = [];
+      delete(self.jsonFile);
+      url = curl_read_json(self, File);
+      if iscell(url) && isnumeric(url{1}) && isequal(url{1}, 40403)
+        capture(self, 'awaitTakePicture');
+      else
+        disp([ mfilename ': [' datestr(now) ']: ' char(url) ]);
+        self.json = url;
+        % in case result is error 40403 "Long Exposure" "Still Capturing Not Finished"
+        % then re-send self.api('awaitTakePicture') until we obtain a result with URL.
+        self.jsonFile = [];
+      end
+    end
+  end
+  
+  % handle continuous shooting mode: do something when camera is IDLE
+  if strcmpi(self.cameraStatus,'IDLE')
+    if any(self.timelapse_clock) && etime(clock, self.timelapse_clock) > self.timelapse_interval
+      self.capture; % take a picture (background execution)
     end
   end
 
