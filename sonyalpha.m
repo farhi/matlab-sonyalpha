@@ -24,6 +24,7 @@ classdef sonyalpha < handle
   %   zoom:               zoom in or out
   %
   %   urlread:            take a picture and return the distant URL (no download)
+  %   urlread(s,'bkg')    same, and executed as background task
   %   imread:             take a picture and download the RGB image (no display)
   %   image:              take a picture and display it
   %   plot:               show the live-view image (not stored)
@@ -117,12 +118,16 @@ classdef sonyalpha < handle
     available     = struct();
     version       = '2.40';
     liveview      = true;
-    lastImage     = [];
-    lastImageURL  = [];
+    lastImage     = []; % last RGB image matrix
+    lastImageURL  = []; % last image URL (e.g. local)
     UserData      = [];
+    
+    jsonFile = [];  % last JSON filename
+    json     = [];  % last json result (string)
   end % properties
   
   properties (Access=private)
+  
     updateTimer   = ''; % a timer object for auto getstatus every 5 s.
     
     % continuous/timelapse modes
@@ -136,10 +141,6 @@ classdef sonyalpha < handle
     show_lines = false;
     ffmpeg   = [];
     period   = 2.0;
-    
-    jsonFile = [];
-    json     = [];
-    
 
   end % properties
   
@@ -244,37 +245,10 @@ classdef sonyalpha < handle
         error(message);
       end
       
-      
     end % curl
     
-    function capture(self, action)
-      % capture get a image (background capture)
-      % 
-      % capture(self, 'awaitTakePicture') wait for end of capture (long exposure)
-      if nargin < 2, action=''; end
-      if isempty(action) && ~strcmp(self.cameraStatus, 'IDLE') % BUSY
-        return
-      end
-      if isempty(action), action = 'actTakePicture'; end
+    % --------------------------------------------------------------------------
 
-      if any(strcmp(self.url, {'gphoto2','gphoto', 'usb'}))
-        error([ mfilename ': asynchronous capture only available in wifi mode' ])
-      else
-        url       = fullfile(self.url, 'sony', 'camera');
-        self.jsonFile = [ tempname '.json' ];
-        json = [ '{"method": "' action '","params": [],"id": 1,"version": "1.0"}' ];
-        cmd = [ 'curl -o ' self.jsonFile ' -d ''' json ''' ' url ];
-        
-        % launch an asynchronous command. Java does not work.
-        if ispc
-          system([ 'start /b ' cmd ]);
-        else
-          system([ cmd ' &' ]);
-        end
-      end
-      
-    end
-    
     % INFO stuff
     function status = getstatus(self)
       % getstatus: get the Camera status and all settings
@@ -318,6 +292,95 @@ classdef sonyalpha < handle
       try; self.imageQuality = status.imageQuality.currentImageQuality; end
 
     end % getstatus
+    
+    function settings = char(self)
+      wb = strtok(self.whiteBalance); if numel(wb)> 4, wb=wb(1:4); end
+      settings = sprintf('%s %s F%s EV%d ISO %s %s Foc:%.2f', ...
+        self.exposureMode, ...
+        num2str(self.shutterSpeed), num2str(self.fNumber), ...
+        num2str(self.exposureCompensation), ...
+        num2str(self.isoSpeedRate), wb, self.int);
+      if ~strcmp(self.cameraStatus, 'IDLE')
+        settings = [ settings ' BUSY' ];
+      end
+    end
+    
+    function display(self)
+      % display(s) display SonyAlpha object (short)
+      
+      if ~isempty(inputname(1))
+        iname = inputname(1);
+      else
+        iname = 'ans';
+      end
+      if isdeployed || ~usejava('jvm') || ~usejava('desktop'), id=class(self);
+      else id=[  '<a href="matlab:doc ' class(self) '">' class(self) '</a> ' ...
+                 '(<a href="matlab:methods ' class(self) '">methods</a>,' ...
+                 '<a href="matlab:image(' iname ');">shoot</a>,' ...
+                 '<a href="matlab:disp(' iname ');">more...</a>)' ];
+      end
+      if ~isempty(self.lastImageURL) 
+        if isdeployed || ~usejava('jvm') || ~usejava('desktop')
+          fprintf(1,'%s = %s [%s] %s\n',iname, id, char(self), self.lastImageURL);
+        else
+          fprintf(1,'%s = %s [%s] <a href="%s">%s</a>\n',iname, id, char(self), ...
+            char(self.lastImageURL),char(self.lastImageURL));
+        end
+      else
+        fprintf(1,'%s = %s [%s]\n',iname, id, char(self));
+      end
+    end % display
+    
+    function disp(self)
+      % disp(s) display SonyAlpha object (details)
+      
+      if ~isempty(inputname(1))
+        iname = inputname(1);
+      else
+        iname = 'ans';
+      end
+      if isdeployed || ~usejava('jvm') || ~usejava('desktop'), id=class(self);
+      else id=[  '<a href="matlab:doc ' class(self) '">' class(self) '</a> ' ...
+                 '(<a href="matlab:methods ' class(self) '">methods</a>,' ...
+                 '<a href="matlab:image(' iname ');">shoot</a>)' ];
+      end
+      fprintf(1,'%s = %s [%s] \n',iname, id, char(self));
+      % display settings
+      items = {'exposureMode','cameraStatus','selfTimer','zoomPosition', ...
+        'shootMode','exposureCompensation','fNumber','focusMode', ...
+        'isoSpeedRate','shutterSpeed','whiteBalance' };
+      c = { };
+      for f=items
+        val = num2str(self.(f{1}));
+        fprintf(1, '%15s = %s\n', f{1}, val);
+      end
+      if ~isempty(self.lastImageURL)
+        if isdeployed || ~usejava('jvm') || ~usejava('desktop')
+          fprintf(1,'   lastImageURL = s\n', self.lastImageURL);
+        else
+          fprintf(1,'   lastImageURL = <a href="%s">%s</a>\n', ...
+            char(self.lastImageURL),char(self.lastImageURL));
+        end
+      end
+    end % disp
+      
+    function about(self)
+      % about: display camera settings
+      
+      % display settings
+      items = {'exposureMode','cameraStatus','selfTimer','zoomPosition', ...
+        'shootMode','exposureCompensation','fNumber','focusMode', ...
+        'isoSpeedRate','shutterSpeed','whiteBalance' };
+      c = { };
+      for f=items
+        val = num2str(self.(f{1}));
+        c{end+1} = sprintf('%s = %s', f{1}, val);
+      end
+      c{end+1} = 'SonyAlpha for Matlab';
+      c{end+1} = '(c) E. Farhi <https://github.com/farhi/matlab-sonyalpha>';
+      helpdlg(c, 'SonyAlpha: Settings');
+      
+    end
     
     % generic API call ---------------------------------------------------------
     
@@ -386,14 +449,26 @@ classdef sonyalpha < handle
     
     
     % Camera Shooting ----------------------------------------------------------
-    function url = urlread(self)
+    function url = urlread(self, opt)
       % urlread: take a picture and return the distant URL (no upload)
+      %
+      %   urlread(self) take a picture and wait for completion. return URL of image.
+      %
+      %   urlread(self, 'background') take a picture as a background task. The URL of
+      %   the image is displayed upon completion, and made available in
+      %   self.lastImageURL. The image RGB matrix is stored in self.lastImage
+      %   This syntax is only available in WIFI mode.
       %
       % Must have used 'start' before (e.g. at init).
       % The resulting image is the 'postview' one, e.g. 2M pixels. The original
       % image remains on the camera.
+      url = [];
       if ~strcmp(self.cameraStatus, 'IDLE') % BUSY
-        url = [];
+        return
+      end
+      
+      if nargin > 1
+        background(self);
         return
       end
       
@@ -620,95 +695,7 @@ classdef sonyalpha < handle
       end
       
     end % plot
-    
-    function settings = char(self)
-      wb = strtok(self.whiteBalance); if numel(wb)> 4, wb=wb(1:4); end
-      settings = sprintf('%s %s F%s EV%d ISO %s %s Foc:%.2f', ...
-        self.exposureMode, ...
-        num2str(self.shutterSpeed), num2str(self.fNumber), ...
-        num2str(self.exposureCompensation), ...
-        num2str(self.isoSpeedRate), wb, self.int);
-      if ~strcmp(self.cameraStatus, 'IDLE')
-        settings = [ settings ' BUSY' ];
-      end
-    end
-    
-    function display(self)
-      % display(s) display SonyAlpha object (short)
-      
-      if ~isempty(inputname(1))
-        iname = inputname(1);
-      else
-        iname = 'ans';
-      end
-      if isdeployed || ~usejava('jvm') || ~usejava('desktop'), id=class(self);
-      else id=[  '<a href="matlab:doc ' class(self) '">' class(self) '</a> ' ...
-                 '(<a href="matlab:methods ' class(self) '">methods</a>,' ...
-                 '<a href="matlab:image(' iname ');">shoot</a>,' ...
-                 '<a href="matlab:disp(' iname ');">more...</a>)' ];
-      end
-      if ~isempty(self.lastImageURL) 
-        if isdeployed || ~usejava('jvm') || ~usejava('desktop')
-          fprintf(1,'%s = %s [%s] %s\n',iname, id, char(self), self.lastImageURL);
-        else
-          fprintf(1,'%s = %s [%s] <a href="%s">%s</a>\n',iname, id, char(self), self.lastImageURL,self.lastImageURL);
-        end
-      else
-        fprintf(1,'%s = %s [%s]\n',iname, id, char(self));
-      end
-    end % display
-    
-    function disp(self)
-      % disp(s) display SonyAlpha object (details)
-      
-      if ~isempty(inputname(1))
-        iname = inputname(1);
-      else
-        iname = 'ans';
-      end
-      if isdeployed || ~usejava('jvm') || ~usejava('desktop'), id=class(self);
-      else id=[  '<a href="matlab:doc ' class(self) '">' class(self) '</a> ' ...
-                 '(<a href="matlab:methods ' class(self) '">methods</a>,' ...
-                 '<a href="matlab:image(' iname ');">shoot</a>)' ];
-      end
-      fprintf(1,'%s = %s [%s] \n',iname, id, char(self));
-      % display settings
-      items = {'exposureMode','cameraStatus','selfTimer','zoomPosition', ...
-        'shootMode','exposureCompensation','fNumber','focusMode', ...
-        'isoSpeedRate','shutterSpeed','whiteBalance' };
-      c = { };
-      for f=items
-        val = num2str(self.(f{1}));
-        fprintf(1, '%15s = %s\n', f{1}, val);
-      end
-      if ~isempty(self.lastImageURL)
-        if isdeployed || ~usejava('jvm') || ~usejava('desktop')
-          fprintf(1,'  Last Image: s\n', self.lastImageURL);
-        else
-          fprintf(1,'  Last Image: <a href="%s">%s</a>\n', self.lastImageURL,self.lastImageURL);
-        end
-      end
-    end
-      
-    
-    function about(self)
-      % about: display camera settings
-      
-      % display settings
-      items = {'exposureMode','cameraStatus','selfTimer','zoomPosition', ...
-        'shootMode','exposureCompensation','fNumber','focusMode', ...
-        'isoSpeedRate','shutterSpeed','whiteBalance' };
-      c = { };
-      for f=items
-        val = num2str(self.(f{1}));
-        c{end+1} = sprintf('%s = %s', f{1}, val);
-      end
-      c{end+1} = 'SonyAlpha for Matlab';
-      c{end+1} = '(c) E. Farhi <https://github.com/farhi/matlab-sonyalpha>';
-      helpdlg(c, 'SonyAlpha: Settings');
-      
-    end
-    
+
     % upper level continuous/timelapse modes
     function continuous(self)
       % continuous: take pictures continuously
@@ -951,44 +938,6 @@ classdef sonyalpha < handle
   
 end % sonyalpha class
 
-function message=curl_read_json(self, message)
-  try
-  if ~isempty(dir(message))
-    message = fileread(message)
-  end
-  end
-  
-  % decode JSON output into struct
-  if ~any(strcmp(self.url, {'gphoto2','gphoto', 'usb'}))
-    try
-      if ~isempty(message)
-        index = isstrprop(message, 'print');
-        message = message(index);
-        message = strrep(message, '\/','/');
-        message = loadjson(message); % We use JSONlab reader which is more robust
-      end
-    catch ME
-      disp(message)
-      disp([ mfilename ': Invalid JSON result. Perhaps the connection failed ?' ])
-    end
-  end
-
-  if isstruct(message) && isfield(message, 'result') && ischar(message.result)
-    message.result = strrep(message.result', '\/','/');
-  end
-  if isstruct(message) && numel(fieldnames(message)) == 2
-    if  isfield(message, 'result')
-      message = message.result;
-    elseif isfield(message, 'error')
-      message = message.error;
-    end
-  end
-  if iscell(message) && numel(message) == 1
-    message = message{1};
-  end
-  
-end % curl_read_json
-
 % simple interface build: show current live-view/last image, and
 % camera set-up menu.
 % -----------------------------------------------------------------------
@@ -1163,58 +1112,11 @@ function plot_pointers(src, evnt, self, cmd)
   else
     set(t,'Color', 'y', 'FontSize', 18, 'Tag', 'SonyAlpha_Info');
   end
+  set(self.figure, 'Name', [ 'SonyAlpha: ' self.cameraStatus ' ' self.url ]);
 
   set(fig, 'HandleVisibility','off', 'NextPlot','new');
   
 end % plot_pointers
-
-function ret=open_system_browser(url)
-  % opens URL with system browser. Returns non zero in case of error.
-  if strncmp(url, 'file://', length('file://'))
-    url = url(8:end);
-  end
-  ret = 1;
-  if ismac,      precmd = 'DYLD_LIBRARY_PATH= ;';
-  elseif isunix, precmd = 'LD_LIBRARY_PATH= ; '; 
-  else           precmd=''; end
-  if ispc
-    ret=system([ precmd 'start "' url '"']);
-  elseif ismac
-    ret=system([ precmd 'open "' url '"']);
-  else
-    [ret, message]=system([ precmd 'xdg-open "' url '"']);
-  end
-end % open_system_browser
-
-function present = ffmpeg_check
-% check if ffmpeg is present
-
-  % required to avoid Matlab to use its own libraries
-  if ismac,      precmd = 'DYLD_LIBRARY_PATH= ; DISPLAY= ; ';
-  elseif isunix, precmd = 'LD_LIBRARY_PATH= ;  DISPLAY= ; '; 
-  else           precmd = ''; end
-  
-  present = '';
-  for totest = { 'ffmpeg' }
-    if ~isempty(present), break; end
-    for ext={'','.exe','.out'}
-      % look for executable and test with various extensions
-      [status, result] = system([ precmd totest{1} ext{1} ]);
-      if (status == 1 || status == 255) 
-        present = [ totest{1} ext{1} ];
-        break
-      end
-    end
-  end
-  
-  if isempty(present)
-    disp([ mfilename ': WARNING: FFMPEG executable is not installed. Get it at https://www.ffmpeg.org/' ]);
-    disp('  The LiveView may be unactivated, but you can still take pictures.')
-  else
-    disp([ '  FFMPEG          (https://www.ffmpeg.org/) as "' present '"' ]);
-  end
-  
-end
 
 % ------------------------------------------------------------------------------
 % CallBacks
@@ -1274,13 +1176,21 @@ function TimerCallback(src, evnt)
       delete(self.jsonFile);
       url = curl_read_json(self, File);
       if iscell(url) && isnumeric(url{1}) && isequal(url{1}, 40403)
-        capture(self, 'awaitTakePicture');
+        background(self, 'awaitTakePicture');
       else
-        disp([ mfilename ': [' datestr(now) ']: ' char(url) ]);
-        self.json = url;
+        url = char(url);
+        disp([ mfilename ': [' datestr(now) ']: ' url ]);
+        self.json         = url;
         % in case result is error 40403 "Long Exposure" "Still Capturing Not Finished"
         % then re-send self.api('awaitTakePicture') until we obtain a result with URL.
         self.jsonFile = [];
+        % we save the image as LiveView.jpg
+        [p, f, ext] = fileparts(url);
+        filename = fullfile(tempdir, [ f ext ]); % saves locally using the distant image name
+        urlwrite(url, filename);
+        self.lastImage   = imread(filename); % store so that we can get it !
+        self.lastImageURL= filename;
+        copyfile(filename, fullfile(tempdir, 'LiveView.jpg'));
       end
     end
   end
@@ -1288,7 +1198,7 @@ function TimerCallback(src, evnt)
   % handle continuous shooting mode: do something when camera is IDLE
   if strcmpi(self.cameraStatus,'IDLE')
     if any(self.timelapse_clock) && etime(clock, self.timelapse_clock) > self.timelapse_interval
-      self.capture; % take a picture (background execution)
+      self.background; % take a new picture (background execution)
     end
   end
 
