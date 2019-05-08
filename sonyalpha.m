@@ -28,7 +28,7 @@ classdef sonyalpha < handle
   %   imread:             take a picture and download the RGB image (no display)
   %   image:              take a picture and display it
   %   plot:               show the live-view image (not stored)
-  %   close:              close plot/image window and stop shoting mode.
+  %   close:              close plot/image window and stop shooting mode.
   %
   %   continuous:         start/stop continuous shooting with current settings.
   %   timelapse:          start/stop timelapse  shooting with current settings.
@@ -146,11 +146,15 @@ classdef sonyalpha < handle
   
   methods
     function self = sonyalpha(url)
-      % sonyalpha: initialize the remote control for Sony Alpha Camera
+      % SONYALPHA initialize the remote control for Sony Alpha Camera
+      %   The camera is accessbile through JSON messages at URL 
+      %   http://192.168.122.1:8080/sony/camera
+      % 
+      %   s = SONYALPHA start the Sony remote control with default IP
+      %   http://192.168.122.1:8080
       %
-      %   s = sonyalpha;
-      %
-      % the default url is http://192.168.122.1:8080/sony/camera
+      %   s = SONYALPHA('http://IP:8080') starts the camera remote control with 
+      %   given IP and port.
       if nargin == 1
         self.url = url;
       end
@@ -216,7 +220,9 @@ classdef sonyalpha < handle
     
     % main communication method (low-level)
     function message = curl(self, post, target)
-      % prepare curl command
+      % CURL prepare curl command
+      %   result = CURL(s, post) sends the JSON message post to the camera.
+      %   the result is a struct or JSON string.
       
       if nargin < 3, target = 'camera'; end
       
@@ -235,6 +241,7 @@ classdef sonyalpha < handle
         % evaluate command
         [ret, message]=system([ precmd  cmd ]);
         message = curl_read_json(self, message); % into struct
+        
       end
       if isempty(self.jsonFile) self.json = message; end
       
@@ -251,7 +258,8 @@ classdef sonyalpha < handle
 
     % INFO stuff
     function status = getstatus(self)
-      % getstatus: get the Camera status and all settings
+      % GETSTATUS get the Camera status and all settings.
+      %   status = GETSTATUS(s) returns a structure with main settings.
       json = '{"method": "getEvent", "params": [false], "id": 1, "version": "1.2"}';
       message = curl(self, json);
       if ~iscell(message), message = { message }; end
@@ -294,6 +302,8 @@ classdef sonyalpha < handle
     end % getstatus
     
     function settings = char(self)
+    % CHAR returns a string that gathers main camera settings.
+    %   c = CHAR(s) returns a string with settings.
       wb = strtok(self.whiteBalance); if numel(wb)> 4, wb=wb(1:4); end
       settings = sprintf('%s %s F%s EV%d ISO %s %s Foc:%.2f', ...
         self.exposureMode, ...
@@ -306,7 +316,7 @@ classdef sonyalpha < handle
     end
     
     function display(self)
-      % display(s) display SonyAlpha object (short)
+      % DISPLAY display SonyAlpha object (short)
       
       if ~isempty(inputname(1))
         iname = inputname(1);
@@ -332,7 +342,7 @@ classdef sonyalpha < handle
     end % display
     
     function disp(self)
-      % disp(s) display SonyAlpha object (details)
+      % DISP display SonyAlpha object (details)
       
       if ~isempty(inputname(1))
         iname = inputname(1);
@@ -365,7 +375,7 @@ classdef sonyalpha < handle
     end % disp
       
     function about(self)
-      % about: display camera settings
+      % ABOUT display camera settings in a dialogue window
       
       % display settings
       items = {'exposureMode','cameraStatus','selfTimer','zoomPosition', ...
@@ -385,10 +395,15 @@ classdef sonyalpha < handle
     % generic API call ---------------------------------------------------------
     
     function ret = api(self, method, value, service)
-      % api('method'):        call the given API method call (without argument)
-      % api('method', param): call the given API method call (with argument)
-      % api(..., service):    call the given API method call, for the API service.
-      %    Default is service='camera'. Other choice is 'avContent'.
+      % API calls the camera API with method.
+      %   API('method') call the given API method call (without argument), e.g. 
+      %   for getting settings and simple actions.
+      %
+      %   API('method', param) call the given API method call (with argument), e.g.
+      %   to set the method values.
+      %
+      %   API(..., service) call the given API method call, for the API service.
+      %   Default is service='camera'. Other choice is 'avContent'.
       if nargin < 4, service=''; end
       if isempty(service), service='camera'; end
       if nargin < 3 || isempty(value)
@@ -407,13 +422,14 @@ classdef sonyalpha < handle
     
     % usual object life handling -----------------------------------------------
     function url=help(self)
-      % help(sb): open the Help page
+      % HELP open the Help page (web browser)
       url = fullfile('file:///',fileparts(which(mfilename)),'doc','SonyAlpha.html');
       open_system_browser(url);
     end
     
     function start(self)
-      % start: set the camera into shooting mode
+      % START set the camera into shooting mode
+      %   START(s) can be used to reset/restart camera control and its timer.
       ret = self.api('startRecMode');
       self.getstatus;
       if isempty(self.updateTimer) || ~isvalid(self.updateTimer)
@@ -428,10 +444,10 @@ classdef sonyalpha < handle
     end % start
     
     function stop(self)
-      % stop: stop the camera shooting.
-      % 
-      % Then, start(s) must be used to be able to take pictures again.
-      %          Use e.g. plot(s) to display the interface.
+      % STOP stop the camera shooting.
+      %   STOP(s) stops camera control and timer.
+      %   Then, START(s) must be used to be able to take pictures again.
+      %   Use e.g. PLOT(s) to display the interface.
       if isvalid(self.updateTimer) && strcmp(self.updateTimer.Running, 'on') 
         stop(self.updateTimer);
       end
@@ -441,27 +457,34 @@ classdef sonyalpha < handle
     end % stop
     
     function close(self)
-      % delete: delete the SonyAlpha connection
+      % CLOSE delete the SonyAlpha connection and its timer.
       stop(self);
       delete(self.updateTimer);
       self.updateTimer='';
     end
     
+    function waitfor(self)
+      % WAITFOR waits for the camera to be idle
+      flag = true;
+      while flag
+        self.getstatus;
+        if strcmp(self.cameraStatus, 'IDLE'); flag=false; break; end
+        pause(2)
+      end
+    end % waitfor
     
     % Camera Shooting ----------------------------------------------------------
-    function url = urlread(self, opt)
-      % urlread: take a picture and return the distant URL (no upload)
+    function url = urlread(self, varargin)
+      % URLREAD take a picture and return the distant URL (no upload)
+      %   URLREAD(self) take a picture and wait for completion. Return URL of image.
+      %   The camera must have been started with START before (e.g. at init).
+      %   The resulting image is the 'postview' one, e.g. 2M pixels. The original
+      %   image remains on the camera.
       %
-      %   urlread(self) take a picture and wait for completion. return URL of image.
-      %
-      %   urlread(self, 'background') take a picture as a background task. The URL of
+      %   URLREAD(self, 'background') take a picture as a background task. The URL of
       %   the image is displayed upon completion, and made available in
       %   self.lastImageURL. The image RGB matrix is stored in self.lastImage
       %   This syntax is only available in WIFI mode.
-      %
-      % Must have used 'start' before (e.g. at init).
-      % The resulting image is the 'postview' one, e.g. 2M pixels. The original
-      % image remains on the camera.
       url = [];
       if ~strcmp(self.cameraStatus, 'IDLE') % BUSY
         return
@@ -495,22 +518,26 @@ classdef sonyalpha < handle
       end
     end % urlread
     
-    function [im,url,info] = urlwrite(self, filename)
-      % urlwrite: take a picture, and download it as a local file
+    function [url,im,info] = urlwrite(self, filename, varargin)
+      % URLWRITE take a picture, and download it as a local file
+      %   [url,im] = URLWRITE(s) takes a picture and return the RGB image and
+      %   its URL. The camera must have been started with START before (e.g. at init).
+      %   The resulting image is the 'postview' one, e.g. 2M pixels. The original
+      %   image remains on the camera.
       %
-      % [im, url] = urlwrite(s, filename)
-      %   write image into 'filename' and return the distant image URL.
+      %   [url,im] = URLWRITE(s, filename) write image into 'filename' and 
+      %   return the distant image URL.
       %
-      % Must have used 'start' before (e.g. at init).
-      % The resulting image is the 'postview' one, e.g. 2M pixels. The original
-      % image remains on the camera (WIFI mode). In GPhoto mode, the files are
-      % the full images.
+      %   URLWRITE(s, filename, 'background') takes a picture in background. 
+      %   The URL of the image is displayed upon completion, and made available in
+      %   self.lastImageURL. The image RGB matrix is stored in self.lastImage
+      %   This syntax is only available in WIFI mode.
       
       if nargin < 2, filename = ''; end
       
       % get the URL and its extension
       im=[]; info=[];
-      url = self.urlread;
+      url = self.urlread(varargin{:});
       if isempty(url), return; end % BUSY
       
       if any(strcmp(self.url, {'gphoto2','gphoto', 'usb'}))
@@ -577,17 +604,18 @@ classdef sonyalpha < handle
       end
     end % urlwrite
     
-    function [im, exif] = imread(self)
-      % imread: take a picture, read it as an RGB matrix, and delete any local file.
+    function [im, exif] = imread(self, varargin)
+      % IMREAD take a picture, read it as an RGB matrix, and delete any local file.
+      %   The camera must have been started with START before (e.g. at init).
+      %   The resulting image is the 'postview' one, e.g. 2M pixels. The original
+      %   image remains on the camera.
       %
-      % [im, exif] = imread(s)
-      %   returns the EXIF data.
+      %   [im, exif] = IMREAD(s) returns the RGB image and its EXIF data.
       %
-      % Must have used 'start' before (e.g. at init).
-      % The resulting image is the 'postview' one, e.g. 2M pixels. The original
-      % image remains on the camera. In GPhoto mode, the files are
-      % the full images.
-      [im,url,exif] = urlwrite(self);
+      %   IMREAD(s, 'background') same as above, but shooting is done in background. 
+      %   The final RGB image is stored in s.lastImage, and its URL in s.lastImageURL
+      %   This syntax is only available in WIFI mode.
+      [url,im,exif] = urlwrite(self, '', varargin{:});
       if isempty(im), return; end % BUSY
       if  ischar(im),   im   = cellstr(im); end
       if ~iscell(exif), exif = { exif }; end
@@ -610,19 +638,25 @@ classdef sonyalpha < handle
      
     end % imread
     
-    function [h, im, exif] = image(self)
-      % image: take a picture, and display it.
+    function [url, im, exif] = image(self, varargin)
+      % IMAGE take a picture, and display it.
+      %   [url, im, exif] = IMAGE(s) return image URL, image RGB matrix and EXIF data.
       %
-      % [h, im, exif] = image(s)
-      %   also return image handle, image RGB matrix and EXIF data.
-      %
-      % Must have used 'start' before (e.g. at init).
-      % The resulting image is the 'postview' one, e.g. 2M pixels. The original
-      % image remains on the camera. In GPhoto mode, the files are
-      % the full images.
-      
-      [im, exif] = imread(self);
-      if isempty(im), h=[]; return; end % BUSY
+      %   IMAGE(s, 'background') same as above, but shooting is done in background. 
+      %   The final RGB image is stored in s.lastImage, and its URL in s.lastImageURL
+      %   This syntax is only available in WIFI mode.
+      im = []; exif = [];
+      if any(strcmp(self.url, {'gphoto2','gphoto', 'usb'}))
+        [im, exif] = imread(self);
+        url = self.lastImageURL;
+      else % WIFI -> asynchronous capture
+        if strcmp(self.cameraStatus, 'IDLE')
+          [url,im, exif] = urlwrite(self, '', varargin{:}); % new picture when IDLE
+        else url = [];
+        end
+      end
+      if isempty(url) || isempty(im), return; end % BUSY
+      if ischar(im) && ~isempty(dir(im)), im = imread(im); end
       fig        = plot_window(self);
       h          = image(im); axis tight;
       if isfield(exif, 'Filename') title(exif.Filename, 'Interpreter','none'); end
@@ -633,13 +667,9 @@ classdef sonyalpha < handle
     end % image
     
     function h = plot(self)
-      % plot: get a live-view image, display it, but does not store it.
-      %
-      % The response time is around 2s.
+      % PLOT get a live-view image, display it, but does not store it.
+      %   The response time is around 2s.
       
-      % TODO:
-      % display pointer(s) for alignement (and keep them)
-      %
       % we could set the ffmpeg as a background commands then monitor for the
       % temporary file, and plot when it comes. 
       %
@@ -698,19 +728,17 @@ classdef sonyalpha < handle
 
     % upper level continuous/timelapse modes
     function continuous(self)
-      % continuous: take pictures continuously
+      % CONTINUOUS take pictures continuously
       %
       % A second call will stop the shooting.
       timelapse(self, 0);
     end % continuous
     
     function timelapse(self, wait)
-      % timelapse: take pictures with current settings every 'wait' seconds
+      % TIMELAPSE take pictures with current settings every 'wait' seconds
+      %   A second call will stop the shooting.
       %
-      % timelapse(s, wait)
-      %   use 'wait' as interval between pictures (in seconds).
-      %
-      % A second call will stop the shooting.
+      %   TIMELAPSE(s, wait) use 'wait' as interval between pictures (in seconds).
       if self.timelapse_clock
         % stop after next capture
         self.timelapse_clock = 0;
@@ -739,11 +767,15 @@ classdef sonyalpha < handle
     
     % Camera settings ----------------------------------------------------------
     function ret = iso(self, value)
-      % iso(s):        get the ISO setting as a string (can be 'AUTO')
-      % iso(s, 'iso'): set the ISO setting as a string (can be 'AUTO')
-      % iso(s, 'supported') return supported ISO settings (strings)
+      % ISO get/set the ISO setting as a string (can be 'AUTO')
+      %   ISO(s) get the ISO setting as a string (can be 'AUTO')
       %
-      % The ISO value can be e.g. AUTO 100 200 400 800 1600 3200 6400 12800 25600 
+      %   ISO(s, 'iso') set the ISO setting as a string (can be 'AUTO')
+      %   The ISO value can be e.g. AUTO 100 200 400 800 1600 3200 6400 12800 25600
+      %
+      %   ISO(s, 'supported') return supported ISO settings (strings)
+      %
+      %  
       if nargin < 2, value = ''; end
       if isempty(value)
         ret = api(self, 'getIsoSpeedRate');
@@ -755,12 +787,15 @@ classdef sonyalpha < handle
     end % iso
     
     function ret = mode(self, value)
-      % mode(s):         get the shooting Mode (e.g. PASM)
-      % mode(s, 'PASM'): set the shooting Mode (e.g. PASM) as a string
-      % mode(s, 'supported') return supported shooting Modes (strings)
+      % MODE get/set the shooting Mode (e.g. PASM)
+      %   MODE(s) get the shooting Mode (e.g. PASM)
       %
-      % The shooting Mode can be 'Program Auto', 'Aperture', 'Shutter', 'Manual'
+      %   MODE(s, 'PASM') set the shooting Mode (e.g. PASM) as a string
+      %   The shooting Mode can be 'Program Auto', 'Aperture', 'Shutter', 'Manual'
       %   'Intelligent Auto', or 'P', 'A', 'S', 'M'
+      %
+      %   MODE(s, 'supported') return supported shooting Modes (strings)
+      
       if nargin < 2, value = ''; end
       if isempty(value)
         ret = api(self, 'getExposureMode');
@@ -784,11 +819,13 @@ classdef sonyalpha < handle
     end % mode
     
     function ret = timer(self, value)
-      % timer(s):      get the self Timer setting
-      % timer(s, val): set the self Timer setting in seconds
-      % timer(s, 'supported') return supported self Timer settings (numeric)
+      % TIMER get/set the self Timer setting
+      %   TIMER(s) get the self Timer setting in seconds
       %
-      % The self Timer value can be e.g. 0, 2 or 10 (numeric)
+      %   TIMER(s, val) set the self Timer setting in seconds
+      %   The self Timer value can be e.g. 0, 2 or 10 (numeric)
+      %
+      %   TIMER(s, 'supported') return supported self Timer settings (numeric)
       if nargin < 2, value = ''; end
       if isempty(value)
         ret = api(self, 'getSelfTimer');
@@ -800,12 +837,14 @@ classdef sonyalpha < handle
     end % timer
     
     function ret = shutter(self, value)
-      % shutter(s):      get the shutter speed setting (S mode)
-      % shutter(s, val): set the shutter speed setting (S mode) as a string
-      % shutter(s, 'supported') return supported shutter speed settings (strings)
+      % SHUTTER get/set the shutter speed setting (S mode)
+      %   SHUTTER(s) get the shutter speed setting
       %
-      % The shutter speed value can be e.g. '30"', '1"', '1/2', '1/30', '1/250' (string)
-      %   where the " symbol stands for seconds.
+      %   SHUTTER(s, val) set the shutter speed setting (S mode) as a string
+      %   The shutter speed value can be e.g. '30"', '1"', '1/2', '1/30', '1/250'
+      %   (string) where the " symbol stands for seconds.
+      %
+      %   SHUTTER(s, 'supported') return supported shutter speed settings (strings)
       if nargin < 2, value = ''; end
       if isempty(value)
         ret = api(self, 'getShutterSpeed');
@@ -823,11 +862,14 @@ classdef sonyalpha < handle
     end % shutter
     
     function ret = fnumber(self, value)
-      % fnumber(s):      get the F/D number (apperture) setting (A mode)
-      % fnumber(s, val): set the F/D number (apperture) setting (A mode) as a string
-      % fnumber(s, 'supported') return supported F/D numbers (strings)
+      % FNUMBER get/set the F/D number (apperture) setting (A mode)
+      %   FNUMBER(s) get the F/D number (apperture) setting (A mode)
       %
-      % The F/D number value can be e.g. '1.4','2.0','2.8','4.0','5.6'
+      %   FNUMBER(s, val) set the F/D number (apperture) setting (A mode) as a string
+      %   The F/D number value can be e.g. '1.4','2.0','2.8','4.0','5.6'
+      %
+      %   FNUMBER(s, 'supported') return supported F/D numbers (strings)
+
       if nargin < 2, value = ''; end
       if isempty(value)
         ret = api(self, 'getFNumber');
@@ -839,9 +881,12 @@ classdef sonyalpha < handle
     end % fnumber
     
     function ret = white(self, value)
-      % white(s):      get the white balance setting
-      % white(s, val): set the white balance setting
-      % white(s, 'supported') return supported white balance modes (strings)
+      % WHITE get/set the white balance setting
+      %   WHITE(s) get the white balance setting
+      %
+      %   WHITE(s, val) set the white balance setting
+      %
+      %   WHITE(s, 'supported') return supported white balance modes (strings)
       %
       % The white balance can be a string such as 
       %  'Auto WB'
@@ -873,9 +918,12 @@ classdef sonyalpha < handle
     end % white
     
     function ret=exp(self, value)
-      % exp(s):      get the Exposure Compensation
-      % exp(s, val): set the Exposure Compensation as a string
-      % exp(s, 'supported') return supported Exposure Compensations (strings)
+      % EXP get/set the Exposure Compensation
+      %   EXP(s) get the Exposure Compensation
+      %
+      %   EXP(s, val) set the Exposure Compensation as a string
+      %
+      %   EXP(s, 'supported') return supported Exposure Compensations (strings)
       %
       % The Exposure Compensation value can be e.g. -9 to 9 in [1/3 EV] units.
       if nargin < 2, value = ''; end
@@ -889,11 +937,14 @@ classdef sonyalpha < handle
     end % exp
     
     function ret=quality(self, value)
-      % quality(s):      get the image quality
-      % quality(s, val): set the image quality as a string
-      % quality(s, 'supported') return supported image quality (strings)
+      % QUALITY get/set the image quality
+      %   QUALITY(s) get the current quality
       %
-      % The qualityn value can be e.g. "RAW+JPEG", "Fine", "Standard"
+      %   QUALITY(s, val) set the image quality as a string
+      %
+      %   QUALITY(s, 'supported') return supported image quality (strings)
+      %
+      % The quality value can be e.g. "RAW+JPEG", "Fine", "Standard"
       if nargin < 2, value = ''; end
       if isempty(value)
         ret = api(self, 'getStillQuality');
@@ -905,9 +956,12 @@ classdef sonyalpha < handle
     end % exp
     
     function ret=focus(self, value)
-      % focus(s):      get the focus mode 
-      % focus(s, val): set the focus mode as a string
-      % focus(s, 'supported') return supported focus modes (strings)
+      % FOCUS get/set the focus mode 
+      %   FOCUS(s) get the focus mode
+      %
+      %   FOCUS(s, val) set the focus mode as a string
+      %
+      %   FOCUS(s, 'supported') return supported focus modes (strings)
       %
       % The F/D number value can be e.g. 'AF-S','AF-C','DMF','MF'
       if nargin < 2, value = ''; end
@@ -921,8 +975,10 @@ classdef sonyalpha < handle
     end % focus
     
     function ret = zoom(self, d)
-      % zoom(s):                get the zoom value
-      % zoom(s, 'in' or 'out'): zoom in or out
+      % ZOOM get/set the zoom value
+      %   ZOOM(s) get the zoom value
+      %
+      %   ZOOM(s, 'in' or 'out') zoom in or out
       if nargin < 2
         ret = self.zoomPosition;
       elseif any(strcmpi(d, {'in','out'}))
@@ -1177,20 +1233,27 @@ function TimerCallback(src, evnt)
       url = curl_read_json(self, File);
       if iscell(url) && isnumeric(url{1}) && isequal(url{1}, 40403)
         background(self, 'awaitTakePicture');
-      else
-        url = char(url);
-        disp([ mfilename ': [' datestr(now) ']: ' url ]);
-        self.json         = url;
-        % in case result is error 40403 "Long Exposure" "Still Capturing Not Finished"
-        % then re-send self.api('awaitTakePicture') until we obtain a result with URL.
-        self.jsonFile = [];
-        % we save the image as LiveView.jpg
-        [p, f, ext] = fileparts(url);
-        filename = fullfile(tempdir, [ f ext ]); % saves locally using the distant image name
-        urlwrite(url, filename);
-        self.lastImage   = imread(filename); % store so that we can get it !
-        self.lastImageURL= filename;
-        copyfile(filename, fullfile(tempdir, 'LiveView.jpg'));
+      elseif iscellstr(url) || ischar(url)
+        try
+          url = char(url);
+          disp([ mfilename ': [' datestr(now) ']: ' url ]);
+          self.json         = url;
+          % in case result is error 40403 "Long Exposure" "Still Capturing Not Finished"
+          % then re-send self.api('awaitTakePicture') until we obtain a result with URL.
+          self.jsonFile = [];
+          % we save the image as LiveView.jpg
+          [p, f, ext] = fileparts(url);
+          filename = fullfile(tempdir, [ f ext ]); % saves locally using the distant image name
+          urlwrite(url, filename);
+          self.lastImage   = imread(filename); % store so that we can get it !
+          self.lastImageURL= filename;
+          copyfile(filename, fullfile(tempdir, 'LiveView.jpg'));
+        catch
+          disp([ mfilename ': error in sonyalpha timer callback'])
+          whos
+          url{:}
+        end
+       
       end
     end
   end
