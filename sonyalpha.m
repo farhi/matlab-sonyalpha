@@ -76,6 +76,13 @@ classdef sonyalpha < handle
   %  resolution), as well as start a continuous or timelapse shooting. To stop the 
   %  continuous/timelapse session, select the Shoot item again.
   %
+  % Monitoring the camera
+  % ---------------------
+  %  The captureStart and captureStop events are triggered when a capture is
+  %  initiated/finalised. You may then monitor these events with e.g.
+  %    so = sonyalpha;
+  %    addlistener(so, 'captureStop', @(src,evt)disp('capture just ended'))
+  %
   % Requirements/Installation
   % -------------------------
   %
@@ -143,6 +150,11 @@ classdef sonyalpha < handle
     period   = 2.0;
 
   end % properties
+  
+  events
+    captureStart
+    captureStop
+  end
   
   methods
     function self = sonyalpha(url)
@@ -490,6 +502,7 @@ classdef sonyalpha < handle
         return
       end
       
+      notify(self, 'captureStart');
       if nargin > 1
         background(self);
         return
@@ -512,6 +525,7 @@ classdef sonyalpha < handle
         url = char(url); % ok
         self.lastImage    = url;
         self.lastImageURL = url;
+        notify(self, 'captureStop');
       else
         self.start; % try to start the camera
         disp([ mfilename ': camera is not ready.' ]);
@@ -1248,6 +1262,7 @@ function TimerCallback(src, evnt)
           self.lastImage   = imread(filename); % store so that we can get it !
           self.lastImageURL= filename;
           copyfile(filename, fullfile(tempdir, 'LiveView.jpg'));
+          notify(self, 'captureStop');
         catch
           disp([ mfilename ': error in sonyalpha timer callback'])
           whos
