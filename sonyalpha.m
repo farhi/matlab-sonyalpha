@@ -162,7 +162,7 @@ classdef sonyalpha < handle
       % check if IP is reachable
       ip = regexp(self.url, '([012]?\d{1,2}\.){3}[012]?\d{1,2}','match');
       ip = java.net.InetAddress.getByName(char(ip));
-      if ~ip.isReachable(10)
+      if ~ip.isReachable(1000)
         disp([ mfilename ': IP ' self.url ' is not reachable. Trying USB connection through gphoto2...' ])
         self.url = 'gphoto2';
       end
