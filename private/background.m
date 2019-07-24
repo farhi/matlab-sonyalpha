@@ -5,6 +5,7 @@ function ret=background(self, action)
     if nargin < 2, action=''; end
     if isempty(action) && ~strcmp(self.cameraStatus, 'IDLE') % BUSY
       ret='BUSY';
+      notify(self, 'busy');
       return
     end
     if isempty(action), action = 'actTakePicture'; end
@@ -24,6 +25,7 @@ function ret=background(self, action)
       else
         ret=system([ cmd ' &' ]);
       end
+      notify(self, 'busy');
     end
     
   end

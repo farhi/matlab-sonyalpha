@@ -127,6 +127,7 @@ classdef sonyalpha < handle
     liveview      = true;
     lastImage     = []; % last RGB image matrix
     lastImageURL  = []; % last image URL (e.g. local)
+    lastImageDate = [];
     UserData      = [];
     
     jsonFile = [];  % last JSON filename
@@ -154,6 +155,8 @@ classdef sonyalpha < handle
   events
     captureStart
     captureStop
+    idle
+    busy
   end
   
   methods
@@ -503,6 +506,7 @@ classdef sonyalpha < handle
       end
       
       notify(self, 'captureStart');
+      notify(self, 'busy');
       if nargin > 1
         background(self);
         return
@@ -525,7 +529,9 @@ classdef sonyalpha < handle
         url = char(url); % ok
         self.lastImage    = url;
         self.lastImageURL = url;
+        self.lastImageDate= now;
         notify(self, 'captureStop');
+        notify(self, 'idle');
       else
         self.start; % try to start the camera
         disp([ mfilename ': camera is not ready.' ]);
@@ -573,6 +579,7 @@ classdef sonyalpha < handle
         end
         self.lastImage    = im{end};
         self.lastImageURL = url{end};
+        self.lastImageDate= now;
         % image has already been saved locally by gphoto2
         % copy to an other specified location ?
         [p,f,ext] = fileparts(url{end});
@@ -606,12 +613,14 @@ classdef sonyalpha < handle
         info.url = url; % distant location
         self.lastImage    = im;
         self.lastImageURL = url;
+        self.lastImageDate= now;
       end
       % save the LiveView.jpg image to show in the plot window
       if ~isempty(self.lastImage)
         if ischar(self.lastImage) && exist(self.lastImage)
           copyfile(self.lastImage, fullfile(tempdir, 'LiveView.jpg'));
           self.lastImage = imread(self.lastImage);
+          self.lastImageDate= now;
         elseif isnumeric(self.lastImage)
           imwrite(self.lastImage, fullfile(tempdir, 'LiveView.jpg'));
         end
@@ -1261,8 +1270,10 @@ function TimerCallback(src, evnt)
           urlwrite(url, filename);
           self.lastImage   = imread(filename); % store so that we can get it !
           self.lastImageURL= filename;
+          self.lastImageDate= now;
           copyfile(filename, fullfile(tempdir, 'LiveView.jpg'));
           notify(self, 'captureStop');
+          notify(self, 'idle');
         catch
           disp([ mfilename ': error in sonyalpha timer callback'])
           whos
