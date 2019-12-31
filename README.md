@@ -11,40 +11,14 @@ Usage
 
 ```matlab
 >> camera = sonyalpha;
-```
- 
-Then you can use the Methods:
-
-- getstatus:          get the camera status
-- start:              set the camera ready for shooting pictures
-- stop:               stop the shooting mode
-- iso:                set/get ISO setting
-- shutter:            set/get shutter speed setting
-- mode:               set/get the PASM mode
-- timer:              set/get the self timer
-- fnumber:            set/get the F/D aperture
-- white:              set/get the white balance
-- exp:                set/get the exposure compensation
-- focus:              set/get the focus mode
-- zoom:               zoom in or out
-- urlread:            take a picture and return the distant URL (no download)
-- imread:             take a picture and download the RGB image (no display)
-- image:              take a picture and display it
-- plot:               show the live-view image (not stored)
-- continuous:         start/stop continuous shooting with current settings.
-- timelapse:          start/stop timelapse  shooting with current settings.
-
-as well as other methods that you can list with:
-```matlab
->> methods(camera)
+>> plot(camera)
+>> capture(camera)
 ```
 
-The LiveView image, that is shown with the "plot" method, is _NOT_ updated continuously, and is rather slow (e.g. 2s).
+The LiveView image, that is shown with the "plot" method, is updated continuously, and is rather slow (e.g. every 2s).
  
 Connecting the Camera
 ---------------------
-
-**WIFI**
   
   Start your camera and use its Remote Control App (e.g. Play Memories App) 
   from the Camera settings. This starts the JSON REST HTTP server, used to 
@@ -61,12 +35,6 @@ Connecting the Camera
 ```matlab
 >> camera = sonyalpha('http://192.168.122.1:8080');
 ```
-
-**USB**
-
-  Alternatively, your can connect the camera with a USB cable. The gphoto2 
-  library will then be used (must be installed - see http://www.gphoto.org/).
-  Set the USB camera in 'PC remote' mode. GPhoto mode is rather slow.
   
 Using the Plot Window
 ---------------------
@@ -88,18 +56,66 @@ Using the Plot Window
   resolution), as well as start a continuous or timelapse shooting. 
   To stop the continuous/timelapse session, select the Shoot item again.
   
+Methods
+-------
+
+- about         Display camera settings in a dialogue window.   
+- addlistener   Add listener for event.   
+- api           Call the camera API with method.   
+- capture       Capture an image with current camera settings (in background).   
+- char          Returns a string that gathers main camera settings.   
+- close         Delete the SonyAlpha connection and its timer.   
+- continuous    Take pictures continuously.   
+- curl          Prepare curl command.   
+- delete        Delete a handle object.   
+- disp          Display SonyAlpha object (details).   
+- display       Display SonyAlpha object (short).  
+- exp           Get/set the Exposure Compensation.   
+- findobj       Find objects matching specified conditions.   
+- findprop      Find property of MATLAB handle object.   
+- fnumber       Get/set the F/D number (apperture) setting (A mode).   
+- focus         Get/set the focus mode.   
+- get_state     Return the camera state, e.g. BUSY, IDLE.   
+- getstatus     Get the Camera status and all settings.  
+- help          Open the Help page (web browser).   
+- image         Take a picture, and display it.   
+- imread        Take a picture, read it as an RGB matrix, and delete any local file.   
+- iso           Get/set the ISO setting as a string (can be 'AUTO'). 
+- isvalid       Test handle validity.   
+- lastImageFile Return the last image file name (or URL).   
+- mode          Get/set the shooting Mode (e.g. PASM).   
+- notify        Notify listeners of event.   
+- plot          Get a live-view image, display it, but does not store it.   
+- quality       Get/set the image quality.   
+- shutter       Get/set the shutter speed setting (S mode).   
+- start         Set the camera into shooting mode.   
+- stop          Stop the camera shooting.   
+- timelapse     Take pictures with current settings every 'wait' seconds.   
+- timer         Get/set the self Timer setting.   
+- urlread       Take a picture and return the distant URL (no upload).   
+- urlwrite      Take a picture, and download it as a local file.   
+- waitfor       Wait for the camera to be idle.   
+- white         Get/set the white balance setting.   
+- zoom          Get/set the zoom value. 
+  
 Requirements/Installation
 -------------------------
 
 - Matlab, no external toolbox
-- A wifi or USB connection
+- A wifi connection
 - A Sony Camera
 - curl (for wifi connection). Get it at https://curl.haxx.se/
 - ffmpeg (for liveview with Wifi). Get it at https://www.ffmpeg.org/
-- GPhoto2 (for usb connection). Get it at http://gphoto.org
 
 Just copy the files and go into the directory. Then type commands above, once the
 camera is configured (see above).
+
+The list of officially supported Sony cameras is: 
+- Alpha 7, R 7S, 7RII, 7SII, 5000, 5100, 6000, 6300, 6500, 
+- NEX   5R, 5T, 6
+
+You may alternatively control the camera via a USB connection with the GPhoto2
+interface from https://github.com/farhi/matlab-gphoto
  
 Credits
 -------
@@ -107,6 +123,7 @@ Credits
 - https://github.com/micolous/gst-plugins-sonyalpha
 - https://github.com/Bloodevil/sony_camera_api
 - https://developer.sony.com/develop/cameras/#overview-content
+- https://developer.sony.com/file/download/sony-camera-remote-api-beta-sdk-2/
  
 (c) E. Farhi, GPL2, 2018.
 

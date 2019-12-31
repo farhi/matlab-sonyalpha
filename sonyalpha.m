@@ -1,6 +1,11 @@
 classdef sonyalpha < handle
   % SONYALPHA A class to control a Sony Alpha Camera (NEX, Alpha, ...) compatible
-  % with the Camera Remote API by Sony.
+  % with the Camera Remote API by Sony, as defined in
+  % https://developer.sony.com/file/download/sony-camera-remote-api-beta-sdk-2/
+  %
+  % The list of officially supported cameras is: 
+  % - Alpha 7, R 7S, 7RII, 7SII, 5000, 5100, 6000, 6300, 6500, 
+  % - NEX   5R, 5T, 6
   %
   % Usage
   % -----
@@ -9,34 +14,33 @@ classdef sonyalpha < handle
   % >> image(camera);
   %
   % Then you can use the Methods:
-  %   getstatus(camera):  get the camera status
-  %   start:              set the camera ready for shooting pictures
-  %   stop:               stop the shooting mode
+  %   getstatus(camera)   get the camera status
+  %   start               set the camera ready for shooting pictures
+  %   stop                stop the shooting mode
   %
-  %   iso:                set/get ISO setting
-  %   shutter:            set/get shutter speed setting
-  %   mode:               set/get the PASM mode
-  %   timer:              set/get the self timer
-  %   fnumber:            set/get the F/D aperture
-  %   white:              set/get the white balance
-  %   exp:                set/get the exposure compensation
-  %   focus:              set/get the focus mode
-  %   zoom:               zoom in or out
+  %   iso                 set/get ISO setting
+  %   shutter             set/get shutter speed setting
+  %   mode                set/get the PASM mode
+  %   timer               set/get the self timer
+  %   fnumber             set/get the F/D aperture
+  %   white               set/get the white balance
+  %   exp                 set/get the exposure compensation
+  %   focus               set/get the focus mode
+  %   zoom                zoom in or out
   %
-  %   urlread:            take a picture and return the distant URL (no download)
+  %   urlread             take a picture and return the distant URL (no download)
   %   urlread(s,'bkg')    same, and executed as background task
-  %   imread:             take a picture and download the RGB image (no display)
-  %   image:              take a picture and display it
-  %   plot:               show the live-view image (not stored)
-  %   close:              close plot/image window and stop shooting mode.
+  %   imread              take a picture and download the RGB image (no display)
+  %   image               take a picture and display it
+  %   capture             same as above, but in background
+  %   plot                show the live-view image (not stored)
+  %   close               close plot/image window and stop shooting mode.
   %
-  %   continuous:         start/stop continuous shooting with current settings.
-  %   timelapse:          start/stop timelapse  shooting with current settings.
+  %   continuous          start/stop continuous shooting with current settings.
+  %   timelapse           start/stop timelapse  shooting with current settings.
   %
-  % Connecting the Camera: wifi or USB
+  % Connecting the Camera
   % ---------------------
-  % 
-  % WIFI:
   %
   % Start your camera and use its Remote Control App (e.g. Play Memories App) 
   % from the Camera settings. This starts the JSON REST HTTP server, used to 
@@ -51,12 +55,6 @@ classdef sonyalpha < handle
   % If you need to specify the camera IP, use:
   %
   % >> camera = sonyalpha('http://192.168.122.1:8080');
-  %
-  % USB:
-  %
-  % Alternatively, your can connect the camera with a USB cable. The gphoto2 
-  % library will then be used (must be installed - see http://www.gphoto.org/).
-  % Set the USB camera in 'PC remote' mode. GPhoto mode is rather slow.
   %
   % Using the Plot Window
   % ---------------------
@@ -87,14 +85,16 @@ classdef sonyalpha < handle
   % -------------------------
   %
   %  - Matlab, no external toolbox
-  %  - A wifi or USB connection
+  %  - A wifi connection
   %  - A Sony Camera
   %  - curl (for wifi connection). Get it at https://curl.haxx.se/
   %  - ffmpeg (for liveview with Wifi). Get it at https://www.ffmpeg.org/
-  %  - GPhoto2 (for usb connection). Get it at http://gphoto.org
   %
   %  Just copy the files and go into the directory. Then type commands above, once the
   %  camera is configured (see above).
+  %
+  % You may alternatively control the camera via a USB connection with the GPhoto2
+  % interface from https://github.com/farhi/matlab-gphoto
 
   % Credits
   % -------
@@ -105,33 +105,33 @@ classdef sonyalpha < handle
   % (c) E. Farhi, GPL2, 2018.
 
   properties
-    url           = 'http://192.168.122.1:8080';
+    url           = 'http://192.168.122.1:8080';  % the URL to reach the camera
     
     % settings, updated on getstatus
-    exposureMode  = 'P';
-    cameraStatus  = 'IDLE';
-    selfTimer     = 0;
-    zoomPosition  = -1;
-    shootMode     = 'still';
-    exposureCompensation = 0; % in EV
-    fNumber       = '2.8';
-    focusMode     = 'AF-S';
-    isoSpeedRate  = 'AUTO';
-    shutterSpeed  = '1/60';
-    whiteBalance  = 'Auto WB';
-    imageQuality  = 'Standard';
+    exposureMode  = 'P';        % exposure mode e.g. PASM
+    cameraStatus  = 'IDLE';     % camera state IDLE or BUSY
+    selfTimer     = 0;          % camera self timer, e.g. 0, 2, 10 s
+    zoomPosition  = -1;         % the zoom position when a zoom is mounted
+    shootMode     = 'still';    % shoot mode, e.g. still, movie, ...
+    exposureCompensation = 0;   % exposure compensation in EV
+    fNumber       = '2.8';      % F/D value
+    focusMode     = 'AF-S';     % focus mode
+    isoSpeedRate  = 'AUTO';     % ISO setting, e.g. AUTO, 1600, ...
+    shutterSpeed  = '1/60';     % shutter speed in sec, e.g. 1/60, 2, ...
+    whiteBalance  = 'Auto WB';  % white balance
+    imageQuality  = 'Standard'; % image quality, e.g. Standard, Fine, RAW+JPEG
     
-    status        = struct();
-    available     = struct();
-    version       = '2.40';
-    liveview      = true;
-    lastImage     = []; % last RGB image matrix
-    lastImageURL  = []; % last image URL (e.g. local)
-    lastImageDate = [];
-    UserData      = [];
+    status        = struct();   % a structure holding current settings
+    available     = struct();   % a structure holding all available settings
+    version       = '2.40';     % version of the Sony API
+    liveview      = true;       % when true, liveview is updated
+    lastImage     = [];         % last RGB image matrix
+    lastImageURL  = [];         % last image URL (e.g. local)
+    lastImageDate = [];         % date of last capture
+    UserData      = [];         % User area
     
-    jsonFile = [];  % last JSON filename
-    json     = [];  % last json result (string)
+    jsonFile = [];              % last JSON filename
+    json     = [];              % last json result (string)
   end % properties
   
   properties (Access=private)
@@ -161,7 +161,7 @@ classdef sonyalpha < handle
   
   methods
     function self = sonyalpha(url)
-      % SONYALPHA initialize the remote control for Sony Alpha Camera
+      % SONYALPHA Initialize the remote control for Sony Alpha Camera.
       %   The camera is accessbile through JSON messages at URL 
       %   http://192.168.122.1:8080/sony/camera
       % 
@@ -178,14 +178,7 @@ classdef sonyalpha < handle
       ip = regexp(self.url, '([012]?\d{1,2}\.){3}[012]?\d{1,2}','match');
       ip = java.net.InetAddress.getByName(char(ip));
       if ~ip.isReachable(1000)
-        disp([ mfilename ': IP ' self.url ' is not reachable. Trying USB connection through gphoto2...' ])
-        self.url = 'gphoto2';
-      end
-      
-      if any(strcmp(self.url, {'gphoto2','gphoto', 'usb'}))
-        self.url    = 'gphoto2';
-        self.period = 20.0;
-        self.liveview = false;
+        disp([ mfilename ': IP ' self.url ' is not reachable.' ])
       end
       
       try
@@ -235,29 +228,24 @@ classdef sonyalpha < handle
     
     % main communication method (low-level)
     function message = curl(self, post, target)
-      % CURL prepare curl command
+      % CURL Prepare curl command.
       %   result = CURL(s, post) sends the JSON message post to the camera.
       %   the result is a struct or JSON string.
       
       if nargin < 3, target = 'camera'; end
+
+      if ismac,      precmd = 'DYLD_LIBRARY_PATH= ;';
+      elseif isunix, precmd = 'LD_LIBRARY_PATH= ; '; 
+      else           precmd=''; end
       
-      if any(strcmp(self.url, {'gphoto2','gphoto', 'usb'}))
-        cmd = post;
-        [ret, message, self] = api_gphoto2(self, post, target);
-      else
-        if ismac,      precmd = 'DYLD_LIBRARY_PATH= ;';
-        elseif isunix, precmd = 'LD_LIBRARY_PATH= ; '; 
-        else           precmd=''; end
-        
-        url = fullfile(self.url, 'sony', target);
-        
-        cmd = [ 'curl -d ''' post ''' ' url ];
-        
-        % evaluate command
-        [ret, message]=system([ precmd  cmd ]);
-        message = curl_read_json(self, message); % into struct
-        
-      end
+      url = fullfile(self.url, 'sony', target);
+      
+      cmd = [ 'curl -d ''' post ''' ' url ];
+      
+      % evaluate command
+      [ret, message]=system([ precmd  cmd ]);
+      message = curl_read_json(self, message); % into struct
+
       if isempty(self.jsonFile) self.json = message; end
       
       if ret % error
@@ -273,7 +261,7 @@ classdef sonyalpha < handle
 
     % INFO stuff
     function status = getstatus(self)
-      % GETSTATUS get the Camera status and all settings.
+      % GETSTATUS Get the Camera status and all settings.
       %   status = GETSTATUS(s) returns a structure with main settings.
       json = '{"method": "getEvent", "params": [false], "id": 1, "version": "1.2"}';
       message = curl(self, json);
@@ -322,7 +310,7 @@ classdef sonyalpha < handle
     end % get_state
     
     function settings = char(self)
-    % CHAR returns a string that gathers main camera settings.
+    % CHAR Returns a string that gathers main camera settings.
     %   c = CHAR(s) returns a string with settings.
       wb = strtok(self.whiteBalance); if numel(wb)> 4, wb=wb(1:4); end
       settings = sprintf('%s %s F%s EV%d ISO %s %s Foc:%.2f', ...
@@ -336,7 +324,7 @@ classdef sonyalpha < handle
     end
     
     function display(self)
-      % DISPLAY display SonyAlpha object (short)
+      % DISPLAY Display SonyAlpha object (short).
       
       if ~isempty(inputname(1))
         iname = inputname(1);
@@ -362,7 +350,7 @@ classdef sonyalpha < handle
     end % display
     
     function disp(self)
-      % DISP display SonyAlpha object (details)
+      % DISP Display SonyAlpha object (details).
       
       if ~isempty(inputname(1))
         iname = inputname(1);
@@ -395,12 +383,12 @@ classdef sonyalpha < handle
     end % disp
     
     function st = lastImageFile(self)
-      % LASTIMAGEFILE return the last image file name (or URL).
+      % LASTIMAGEFILE Return the last image file name (or URL).
       st = self.lastImageURL;
     end % lastImageFile
       
     function about(self)
-      % ABOUT display camera settings in a dialogue window
+      % ABOUT Display camera settings in a dialogue window.
       
       % display settings
       items = {'exposureMode','cameraStatus','selfTimer','zoomPosition', ...
@@ -420,7 +408,7 @@ classdef sonyalpha < handle
     % generic API call ---------------------------------------------------------
     
     function ret = api(self, method, value, service)
-      % API calls the camera API with method.
+      % API Call the camera API with method.
       %   API('method') call the given API method call (without argument), e.g. 
       %   for getting settings and simple actions.
       %
@@ -447,13 +435,13 @@ classdef sonyalpha < handle
     
     % usual object life handling -----------------------------------------------
     function url=help(self)
-      % HELP open the Help page (web browser)
+      % HELP Open the Help page (web browser).
       url = fullfile('file:///',fileparts(which(mfilename)),'doc','SonyAlpha.html');
       open_system_browser(url);
     end
     
     function start(self)
-      % START set the camera into shooting mode
+      % START Set the camera into shooting mode.
       %   START(s) can be used to reset/restart camera control and its timer.
       ret = self.api('startRecMode');
       self.getstatus;
@@ -469,7 +457,7 @@ classdef sonyalpha < handle
     end % start
     
     function stop(self)
-      % STOP stop the camera shooting.
+      % STOP Stop the camera shooting.
       %   STOP(s) stops camera control and timer.
       %   Then, START(s) must be used to be able to take pictures again.
       %   Use e.g. PLOT(s) to display the interface.
@@ -482,14 +470,14 @@ classdef sonyalpha < handle
     end % stop
     
     function close(self)
-      % CLOSE delete the SonyAlpha connection and its timer.
+      % CLOSE Delete the SonyAlpha connection and its timer.
       stop(self);
       delete(self.updateTimer);
       self.updateTimer='';
     end
     
     function waitfor(self)
-      % WAITFOR waits for the camera to be idle
+      % WAITFOR Wait for the camera to be idle.
       flag = true;
       while flag
         self.getstatus;
@@ -500,7 +488,7 @@ classdef sonyalpha < handle
     
     % Camera Shooting ----------------------------------------------------------
     function url = urlread(self, varargin)
-      % URLREAD take a picture and return the distant URL (no upload)
+      % URLREAD Take a picture and return the distant URL (no upload).
       %   URLREAD(self) take a picture and wait for completion. Return URL of image.
       %   The camera must have been started with START before (e.g. at init).
       %   The resulting image is the 'postview' one, e.g. 2M pixels. The original
@@ -549,7 +537,7 @@ classdef sonyalpha < handle
     end % urlread
     
     function [url,im,info] = urlwrite(self, filename, varargin)
-      % URLWRITE take a picture, and download it as a local file
+      % URLWRITE Take a picture, and download it as a local file.
       %   [url,im] = URLWRITE(s) takes a picture and return the RGB image and
       %   its URL. The camera must have been started with START before (e.g. at init).
       %   The resulting image is the 'postview' one, e.g. 2M pixels. The original
@@ -570,61 +558,31 @@ classdef sonyalpha < handle
       url = self.urlread(varargin{:});
       if isempty(url), return; end % BUSY
       
-      if any(strcmp(self.url, {'gphoto2','gphoto', 'usb'}))
-        % for gphoto, we just read the images and return
-        im = {}; url = cellstr(url); info={};
-        for index=1:size(url, 1)
-          disp(url{index})
-          try
-            info{end+1} = imfinfo(url{index});
-            info{end}.url = url{index};
-          catch
-            info{end+1} =  [];
-          end
-          try
-            im{end+1}   = imread(url{index});
-          catch
-            im{end+1}   = [];
-          end
-        end
-        self.lastImage    = im{end};
-        self.lastImageURL = url{end};
-        self.lastImageDate= now;
-        % image has already been saved locally by gphoto2
-        % copy to an other specified location ?
-        [p,f,ext] = fileparts(url{end});
-        if ~isempty(filename) && isdir(filename) && ~strcmp(p, filename)
-          copyfile(url{end}, fullfile(filename, [f ext]));
-        elseif ~isempty(filename)
-          % check extension
-          [p,f,E] = fileparts(filename);
-          if isempty(E), filename = [ filename ext ]; end
-          copyfile(url{end}, filename);
-        end
-      else % wifi API: download images
-        if ~isempty(url) && ~ischar(url)
-          disp(url)
-          return
-        end
-        [p, f, ext] = fileparts(url);
-          
-        if isempty(filename)
-          filename = fullfile(tempdir, [ f ext ]); % saves locally using the distant image name
-        elseif isdir(filename)
-          filename = fullfile(filename, [ f ext ]);
-        else
-          % check extension
-          [p,f,E] = fileparts(filename);
-          if isempty(E), filename = [ filename ext ]; end
-        end
-        % then get URL and display it
-        im   = urlwrite(url, filename);
-        info = imfinfo(filename); % contains actual local image FileName
-        info.url = url; % distant location
-        self.lastImage    = im;
-        self.lastImageURL = url;
-        self.lastImageDate= now;
+
+      % wifi API: download images
+      if ~isempty(url) && ~ischar(url)
+        disp(url)
+        return
       end
+      [p, f, ext] = fileparts(url);
+        
+      if isempty(filename)
+        filename = fullfile(tempdir, [ f ext ]); % saves locally using the distant image name
+      elseif isdir(filename)
+        filename = fullfile(filename, [ f ext ]);
+      else
+        % check extension
+        [p,f,E] = fileparts(filename);
+        if isempty(E), filename = [ filename ext ]; end
+      end
+      % then get URL and display it
+      im   = urlwrite(url, filename);
+      info = imfinfo(filename); % contains actual local image FileName
+      info.url = url; % distant location
+      self.lastImage    = im;
+      self.lastImageURL = url;
+      self.lastImageDate= now;
+
       % save the LiveView.jpg image to show in the plot window
       if ~isempty(self.lastImage)
         if ischar(self.lastImage) && exist(self.lastImage)
@@ -638,7 +596,7 @@ classdef sonyalpha < handle
     end % urlwrite
     
     function [im, exif] = imread(self, varargin)
-      % IMREAD take a picture, read it as an RGB matrix, and delete any local file.
+      % IMREAD Take a picture, read it as an RGB matrix, and delete any local file.
       %   The camera must have been started with START before (e.g. at init).
       %   The resulting image is the 'postview' one, e.g. 2M pixels. The original
       %   image remains on the camera.
@@ -672,22 +630,20 @@ classdef sonyalpha < handle
     end % imread
     
     function [url, im, exif] = image(self, varargin)
-      % IMAGE take a picture, and display it.
+      % IMAGE Take a picture, and display it.
       %   [url, im, exif] = IMAGE(s) return image URL, image RGB matrix and EXIF data.
       %
       %   IMAGE(s, 'background') same as above, but shooting is done in background. 
       %   The final RGB image is stored in s.lastImage, and its URL in s.lastImageURL
       %   This syntax is only available in WIFI mode.
       im = []; exif = [];
-      if any(strcmp(self.url, {'gphoto2','gphoto', 'usb'}))
-        [im, exif] = imread(self);
-        url = self.lastImageURL;
-      else % WIFI -> asynchronous capture
-        if strcmp(self.cameraStatus, 'IDLE')
-          [url,im, exif] = urlwrite(self, '', varargin{:}); % new picture when IDLE
-        else url = [];
-        end
+      
+      % WIFI -> asynchronous capture
+      if strcmp(self.cameraStatus, 'IDLE')
+        [url,im, exif] = urlwrite(self, '', varargin{:}); % new picture when IDLE
+      else url = [];
       end
+
       if isempty(url) || isempty(im), return; end % BUSY
       if ischar(im) && ~isempty(dir(im)), im = imread(im); end
       fig        = plot_window(self);
@@ -700,12 +656,12 @@ classdef sonyalpha < handle
     end % image
     
     function capture(self)
-      % CAPTURE capture an image with current camera settings
-      image(self);
+      % CAPTURE Capture an image with current camera settings (in background).
+      image(self, 'background');
     end % capture
     
     function h = plot(self)
-      % PLOT get a live-view image, display it, but does not store it.
+      % PLOT Get a live-view image, display it, but does not store it.
       %   The response time is around 2s.
       
       % we could set the ffmpeg as a background commands then monitor for the
@@ -729,22 +685,22 @@ classdef sonyalpha < handle
         % get the livestream URL e.g. 
         %   http://192.168.122.1:8080/liveview/liveviewstream
         url = self.api('startLiveview');
-        if ~any(strcmp(self.url, {'gphoto2','gphoto', 'usb'}))
-          if ischar(url) && ~isempty(self.ffmpeg)
-            cmd = [ self.ffmpeg ' -ss 1 -i ' url ' -frames:v 1 ' filename ];
-            if strcmp(self.updateTimer.Running,'on')
-              if ispc
-                cmd = [ 'start /b ' cmd ];
-              else
-                cmd = [ cmd '&' ];
-              end
+
+        if ischar(url) && ~isempty(self.ffmpeg)
+          cmd = [ self.ffmpeg ' -ss 1 -i ' url ' -frames:v 1 ' filename ];
+          if strcmp(self.updateTimer.Running,'on')
+            if ispc
+              cmd = [ 'start /b ' cmd ];
+            else
+              cmd = [ cmd '&' ];
             end
-            
-            [ret, message] = system(cmd);
-            self.api('stopLiveView');
-          else return
           end
+          
+          [ret, message] = system(cmd);
+          self.api('stopLiveView');
+        else return
         end
+
       end
       
       % when timer is Running, the image will be displayed by its Callback
@@ -766,14 +722,14 @@ classdef sonyalpha < handle
 
     % upper level continuous/timelapse modes
     function continuous(self)
-      % CONTINUOUS take pictures continuously
+      % CONTINUOUS Take pictures continuously.
       %
       % A second call will stop the shooting.
       timelapse(self, 0);
     end % continuous
     
     function timelapse(self, wait)
-      % TIMELAPSE take pictures with current settings every 'wait' seconds
+      % TIMELAPSE Take pictures with current settings every 'wait' seconds.
       %   A second call will stop the shooting.
       %
       %   TIMELAPSE(s, wait) use 'wait' as interval between pictures (in seconds).
@@ -805,7 +761,7 @@ classdef sonyalpha < handle
     
     % Camera settings ----------------------------------------------------------
     function ret = iso(self, value)
-      % ISO get/set the ISO setting as a string (can be 'AUTO')
+      % ISO Get/set the ISO setting as a string (can be 'AUTO').
       %   ISO(s) get the ISO setting as a string (can be 'AUTO')
       %
       %   ISO(s, 'iso') set the ISO setting as a string (can be 'AUTO')
@@ -825,7 +781,7 @@ classdef sonyalpha < handle
     end % iso
     
     function ret = mode(self, value)
-      % MODE get/set the shooting Mode (e.g. PASM)
+      % MODE Get/set the shooting Mode (e.g. PASM).
       %   MODE(s) get the shooting Mode (e.g. PASM)
       %
       %   MODE(s, 'PASM') set the shooting Mode (e.g. PASM) as a string
@@ -857,7 +813,7 @@ classdef sonyalpha < handle
     end % mode
     
     function ret = timer(self, value)
-      % TIMER get/set the self Timer setting
+      % TIMER Get/set the self Timer setting.
       %   TIMER(s) get the self Timer setting in seconds
       %
       %   TIMER(s, val) set the self Timer setting in seconds
@@ -875,7 +831,7 @@ classdef sonyalpha < handle
     end % timer
     
     function ret = shutter(self, value)
-      % SHUTTER get/set the shutter speed setting (S mode)
+      % SHUTTER Get/set the shutter speed setting (S mode).
       %   SHUTTER(s) get the shutter speed setting
       %
       %   SHUTTER(s, val) set the shutter speed setting (S mode) as a string
@@ -900,7 +856,7 @@ classdef sonyalpha < handle
     end % shutter
     
     function ret = fnumber(self, value)
-      % FNUMBER get/set the F/D number (apperture) setting (A mode)
+      % FNUMBER Get/set the F/D number (apperture) setting (A mode).
       %   FNUMBER(s) get the F/D number (apperture) setting (A mode)
       %
       %   FNUMBER(s, val) set the F/D number (apperture) setting (A mode) as a string
@@ -919,7 +875,7 @@ classdef sonyalpha < handle
     end % fnumber
     
     function ret = white(self, value)
-      % WHITE get/set the white balance setting
+      % WHITE Get/set the white balance setting.
       %   WHITE(s) get the white balance setting
       %
       %   WHITE(s, val) set the white balance setting
@@ -956,7 +912,7 @@ classdef sonyalpha < handle
     end % white
     
     function ret=exp(self, value)
-      % EXP get/set the Exposure Compensation
+      % EXP Get/set the Exposure Compensation.
       %   EXP(s) get the Exposure Compensation
       %
       %   EXP(s, val) set the Exposure Compensation as a string
@@ -975,7 +931,7 @@ classdef sonyalpha < handle
     end % exp
     
     function ret=quality(self, value)
-      % QUALITY get/set the image quality
+      % QUALITY Get/set the image quality.
       %   QUALITY(s) get the current quality
       %
       %   QUALITY(s, val) set the image quality as a string
@@ -994,7 +950,7 @@ classdef sonyalpha < handle
     end % exp
     
     function ret=focus(self, value)
-      % FOCUS get/set the focus mode 
+      % FOCUS Get/set the focus mode.
       %   FOCUS(s) get the focus mode
       %
       %   FOCUS(s, val) set the focus mode as a string
@@ -1013,7 +969,7 @@ classdef sonyalpha < handle
     end % focus
     
     function ret = zoom(self, d)
-      % ZOOM get/set the zoom value
+      % ZOOM Get/set the zoom value.
       %   ZOOM(s) get the zoom value
       %
       %   ZOOM(s, 'in' or 'out') zoom in or out
