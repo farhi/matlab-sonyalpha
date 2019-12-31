@@ -178,18 +178,26 @@ classdef sonyalpha < handle
       ip = regexp(self.url, '([012]?\d{1,2}\.){3}[012]?\d{1,2}','match');
       ip = java.net.InetAddress.getByName(char(ip));
       if ~ip.isReachable(1000)
-        disp([ mfilename ': IP ' self.url ' is not reachable.' ])
+        disp([ mfilename ': IP ' self.url ' is not reachable. Using simulate mode.' ])
+        self.url = 'sim';
       end
+
+      
       
       try
-        self.version = self.api('getApplicationInfo');
+        ret = self.api('startRecMode');
       catch ME
         getReport(ME)
         error([ mfilename ': No Camera found.' ]);
       end
-      if iscell(self.version), self.version = [ self.version{:} ]; end
       
-      ret = self.api('startRecMode');
+      
+      vers = self.api('getApplicationInfo');
+      try
+        if iscell(vers), self.version = [ vers{:} ];
+        else self.version = vers;
+        end
+      end
       self.getstatus;
 
       % get the camera available settings
@@ -236,15 +244,21 @@ classdef sonyalpha < handle
 
       if ismac,      precmd = 'DYLD_LIBRARY_PATH= ;';
       elseif isunix, precmd = 'LD_LIBRARY_PATH= ; '; 
-      else           precmd=''; end
+      else           precmd = ''; end
       
       url = fullfile(self.url, 'sony', target);
       
       cmd = [ 'curl -d ''' post ''' ' url ];
       
       % evaluate command
-      [ret, message]=system([ precmd  cmd ]);
-      message = curl_read_json(self, message); % into struct
+      if ~strcmp(self.url, 'sim')
+        [ret, message]=system([ precmd  cmd ]);
+        message = curl_read_json(self, message); % into struct
+      else
+        loaded = load(fullfile(fileparts(which(mfilename)), [ mfilename '.mat' ]));
+        message = loaded.status;
+        ret = 0;
+      end
 
       if isempty(self.jsonFile) self.json = message; end
       
