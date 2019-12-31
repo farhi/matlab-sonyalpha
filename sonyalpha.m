@@ -316,6 +316,11 @@ classdef sonyalpha < handle
 
     end % getstatus
     
+    function st = get_state(self)
+      % GET_STATE Return the camera state, e.g. BUSY, IDLE.
+      st = self.cameraStatus;
+    end % get_state
+    
     function settings = char(self)
     % CHAR returns a string that gathers main camera settings.
     %   c = CHAR(s) returns a string with settings.
@@ -388,6 +393,11 @@ classdef sonyalpha < handle
         end
       end
     end % disp
+    
+    function st = lastImageFile(self)
+      % LASTIMAGEFILE return the last image file name (or URL).
+      st = self.lastImageURL;
+    end % lastImageFile
       
     function about(self)
       % ABOUT display camera settings in a dialogue window
@@ -688,6 +698,11 @@ classdef sonyalpha < handle
       set(fig, 'HandleVisibility','off', 'NextPlot','new');
       plot_pointers('','',self);
     end % image
+    
+    function capture(self)
+      % CAPTURE capture an image with current camera settings
+      image(self);
+    end % capture
     
     function h = plot(self)
       % PLOT get a live-view image, display it, but does not store it.
