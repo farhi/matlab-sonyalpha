@@ -129,6 +129,7 @@ classdef sonyalpha < handle
     lastImageURL  = [];         % last image URL (e.g. local)
     lastImageDate = [];         % date of last capture
     UserData      = [];         % User area
+    verbose       = 0;          % gives more I/O output when 1 or 2
     
     jsonFile = [];              % last JSON filename
     json     = [];              % last json result (string)
@@ -178,20 +179,18 @@ classdef sonyalpha < handle
       ip = regexp(self.url, '([012]?\d{1,2}\.){3}[012]?\d{1,2}','match');
       ip = java.net.InetAddress.getByName(char(ip));
       if ~ip.isReachable(1000)
-        disp([ mfilename ': IP ' self.url ' is not reachable. Using simulate mode.' ])
+        disp([ mfilename ': IP ' self.url ' is not reachable. ' ])
+        disp('*** Switching to simulate mode.');
         self.url = 'sim';
       end
 
-      
-      
       try
         ret = self.api('startRecMode');
       catch ME
         getReport(ME)
         error([ mfilename ': No Camera found.' ]);
       end
-      
-      
+
       vers = self.api('getApplicationInfo');
       try
         if iscell(vers), self.version = [ vers{:} ];
@@ -259,13 +258,18 @@ classdef sonyalpha < handle
         message = loaded.status;
         ret = 0;
       end
+      
+      if self.verbose > 1
+        disp([ '[' datestr(now) '] ' mfilename ': ' cmd ])
+        disp(message);
+      end
 
       if isempty(self.jsonFile) self.json = message; end
       
       if ret % error
         disp(cmd)
         disp([ mfilename ': Connection failed: ' url])
-        disp('You need to restart the SonyAlpha with: start(s)');
+        disp('*** You need to restart the SonyAlpha with: start(s)');
         error(message);
       end
       
@@ -517,6 +521,24 @@ classdef sonyalpha < handle
         return
       end
       
+      if strcmp(self.url,'sim')
+        % simulate: we generate an image file
+        % simulation mode: we generate a preview image
+        notify(self, 'captureStart');
+        p = fullfile(fileparts(which(mfilename)),'Images');
+        d = dir(p);
+        index = [ d.isdir ];
+        index = find(~index);
+        r = ceil(rand*numel(index));
+        url = fullfile(p, char(d(index(r)).name));
+        self.lastImageURL  = url;
+        self.lastImage     = self.lastImageURL;
+        self.lastImageDate = clock;
+        notify(self, 'captureStop');
+        if self.verbose, disp([ '[' datestr(now) '] ' char(self.lastImageURL) ]); end
+        return
+      end
+      
       notify(self, 'captureStart');
       notify(self, 'busy');
       if nargin > 1
@@ -544,6 +566,7 @@ classdef sonyalpha < handle
         self.lastImageDate= now;
         notify(self, 'captureStop');
         notify(self, 'idle');
+        if self.verbose, disp([ '[' datestr(now) '] ' fullfile(self.dir, char(self.lastImageURL))]); end
       else
         self.start; % try to start the camera
         disp([ mfilename ': camera is not ready.' ]);
@@ -590,7 +613,12 @@ classdef sonyalpha < handle
         if isempty(E), filename = [ filename ext ]; end
       end
       % then get URL and display it
-      im   = urlwrite(url, filename);
+      if isempty(dir(url))
+        im   = urlwrite(url, filename);
+      else
+        im = url;
+        copyfile(url, filename);
+      end
       info = imfinfo(filename); % contains actual local image FileName
       info.url = url; % distant location
       self.lastImage    = im;
@@ -750,7 +778,7 @@ classdef sonyalpha < handle
       if self.timelapse_clock
         % stop after next capture
         self.timelapse_clock = 0;
-        disp([ mfilename ': stop shooting' ])
+        disp([ '[' datestr(now) '] ' mfilename ': stop shooting' ])
       else
         if nargin < 2
           prompt = {'Enter Time-Lapse Periodicity [s]'};
@@ -766,9 +794,9 @@ classdef sonyalpha < handle
         self.timelapse_interval = wait;
         self.timelapse_clock    = clock;
         if wait > 0
-          disp([ mfilename ': start shooting (timelapse every ' num2str(wait) ' [s])' ]);
+          disp([ '[' datestr(now) '] ' mfilename ': start shooting (timelapse every ' num2str(wait) ' [s])' ]);
         else
-          disp([ mfilename ': start shooting (continuous)' ]);
+          disp([ '[' datestr(now) '] ' mfilename ': start shooting (continuous)' ]);
         end
       end
     end
@@ -1064,14 +1092,16 @@ function h = plot_window(self)
       end
       if ~isempty(available) && iscell(available)
         for index2 = 1:numel(available)
-          if isstruct(available{index2})
+          if isstruct(available{index2}) && isfield(available{index2},'whiteBalanceMode')
             available{index2} = getfield(available{index2},'whiteBalanceMode');
           end
           if isnumeric(available{index2}) && numel(available{index2}) > 1
             tmp = available{index2}; tmp=tmp(:)'; available{index2} = tmp;
           end
-          m2 = uimenu(m1, 'Label', num2str(available{index2}), ...
-            'Callback', {@MenuCallback, method, self, available{index2} });
+          if ischar(available{index2}) || isnumeric(available{index2})
+            m2 = uimenu(m1, 'Label', num2str(available{index2}), ...
+              'Callback', {@MenuCallback, method, self, available{index2} });
+          end
         end
       end
     end
@@ -1272,13 +1302,12 @@ function TimerCallback(src, evnt)
   % handle continuous shooting mode: do something when camera is IDLE
   if strcmpi(self.cameraStatus,'IDLE')
     if any(self.timelapse_clock) && etime(clock, self.timelapse_clock) > self.timelapse_interval
-      self.background; % take a new picture (background execution)
+      background(self); % take a new picture (background execution)
     end
   end
 
   % test if an image was generated in background and update the plot
   filename = fullfile(tempdir, 'LiveView.jpg');
-
   if self.liveview && exist(filename, 'file')
     % read the image and display it. delete tmp file.
     im  = imread(filename);
