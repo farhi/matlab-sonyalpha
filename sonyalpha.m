@@ -145,13 +145,16 @@ classdef sonyalpha < handle
     timelapse_clock = 0;    % clock when last shot
     timelapse_interval = 0; % time between shots
     figure   = [];
-    axes     = [];
+    image_axes     = [];
     x        = []; % a list of coordinates where to add pointers
     y        = [];
     int      = []; % the intensity contrast around pointers
     show_lines = false;
     ffmpeg   = [];
-    period   = 2.0;
+    timer_period   = 2.0;
+    
+    focus_history = [];
+    focus_axes    = [];
 
   end % properties
   
@@ -223,7 +226,7 @@ classdef sonyalpha < handle
       self.ffmpeg = ffmpeg_check;
       
       self.updateTimer  = timer('TimerFcn', @TimerCallback, ...
-          'Period', self.period, 'ExecutionMode', 'fixedDelay', ...
+          'Period', self.timer_period, 'ExecutionMode', 'fixedDelay', ...
           'Name', mfilename);
       set(self.updateTimer, 'UserData', self);
       start(self.updateTimer);
@@ -329,6 +332,23 @@ classdef sonyalpha < handle
       st = self.cameraStatus;
     end % get_state
     
+    function c = get(self, config)
+      % GET get the camera configuration
+      %   GET(g) get all configuration states (from cache) as a struct, into 'ans'.
+      %
+      %   GET(g, config) update the specified configuration from the camera.
+      %
+      %   GET(g, 'all') force to read all configuration values.
+      if nargin == 1, config = ''; end
+      if ~ischar(config), return; end
+      
+      c = getstatus(self);
+      
+      if ~strcmp(config, 'all') && isfield(c, config)
+        c = getfield(c, config);
+      end
+    end % get
+    
     function settings = char(self)
     % CHAR Returns a string that gathers main camera settings.
     %   c = CHAR(s) returns a string with settings.
@@ -338,7 +358,7 @@ classdef sonyalpha < handle
         num2str(self.shutterSpeed), num2str(self.fNumber), ...
         num2str(self.exposureCompensation), ...
         num2str(self.isoSpeedRate), wb, self.int);
-      if ~strcmp(self.cameraStatus, 'IDLE')
+      if ishold(self) % BUSY
         settings = [ settings ' BUSY' ];
       end
     end
@@ -467,7 +487,7 @@ classdef sonyalpha < handle
       self.getstatus;
       if isempty(self.updateTimer) || ~isvalid(self.updateTimer)
         self.updateTimer  = timer('TimerFcn', @TimerCallback, ...
-          'Period', self.period, 'ExecutionMode', 'fixedDelay', ...
+          'Period', self.timer_period, 'ExecutionMode', 'fixedDelay', ...
           'Name', mfilename);
       set(self.updateTimer, 'UserData', self);
       end
@@ -489,6 +509,13 @@ classdef sonyalpha < handle
       if ishandle(self.figure), delete(self.figure); end
     end % stop
     
+    function reset(self)
+      % RESET reset the camera connection.
+      stop(self);
+      pause(2);
+      start(self);
+    end % reset
+    
     function close(self)
       % CLOSE Delete the SonyAlpha connection and its timer.
       stop(self);
@@ -496,12 +523,22 @@ classdef sonyalpha < handle
       self.updateTimer='';
     end
     
+    function delete(self)
+      % DELETE close the Gphoto connection
+      close(self);
+    end % delete
+    
+    function id = identify(self)
+      id = [ 'Sony Alpha camera on ' self.url ' ' self.version ];
+      disp([ mfilename ': connected to ' id ]);
+    end % identify
+    
     function waitfor(self)
       % WAITFOR Wait for the camera to be idle.
       flag = true;
       while flag
         self.getstatus;
-        if strcmp(self.cameraStatus, 'IDLE'); flag=false; break; end
+        if ~ishold(self), flag=false; break; end % IDLE
         pause(2)
       end
     end % waitfor
@@ -519,7 +556,7 @@ classdef sonyalpha < handle
       %   self.lastImageURL. The image RGB matrix is stored in self.lastImage
       %   This syntax is only available in WIFI mode.
       url = [];
-      if ~strcmp(self.cameraStatus, 'IDLE') % BUSY
+      if ishold(self) % BUSY
         return
       end
       
@@ -683,7 +720,7 @@ classdef sonyalpha < handle
       im = []; exif = [];
       
       % WIFI -> asynchronous capture
-      if strcmp(self.cameraStatus, 'IDLE')
+      if ~ishold(self) % IDLE
         [url,im, exif] = urlwrite(self, '', varargin{:}); % new picture when IDLE
       else url = [];
       end
@@ -691,11 +728,10 @@ classdef sonyalpha < handle
       if isempty(url) || isempty(im), return; end % BUSY
       if ischar(im) && ~isempty(dir(im)), im = imread(im); end
       fig        = plot_window(self);
-      h          = image(im); axis tight;
+      [h,self]   = show_image(self, im);
       if isfield(exif, 'Filename') title([ '[' datestr(clock) '] ' exif.Filename ], 'Interpreter','none'); end
       set(h, 'ButtonDownFcn',        {@ButtonDownCallback, self}, ...
         'Tag', 'SonyAlpha_Image');
-      set(fig, 'HandleVisibility','off', 'NextPlot','new');
       plot_pointers('','',self);
     end % image
     
@@ -703,6 +739,11 @@ classdef sonyalpha < handle
       % CAPTURE Capture an image with current camera settings (in background).
       image(self, 'background');
     end % capture
+    
+    function preview(self)
+      % PREVIEW Capture an image with current camera settings
+      image(self, 'background');
+    end
     
     function h = plot(self)
       % PLOT Get a live-view image, display it, but does not store it.
@@ -754,15 +795,38 @@ classdef sonyalpha < handle
         % read the image and display it immediately. delete tmp file.
         im  = imread(filename);
         fig = plot_window(self);
-        h   = image(im); axis tight;
+        [h,self]   = show_image(self, im);
         set(h, 'ButtonDownFcn',        {@ButtonDownCallback, self}, ...
           'Tag', 'SonyAlpha_Image');
-        set(fig, 'HandleVisibility','off', 'NextPlot','new');
         delete(filename);
         plot_pointers('','',self);
       end
       
     end % plot
+    
+    function dt = period(self, varargin)
+      % PERIOD get or set the gphoto preview/continuous rate, in [s].
+      %   PERIOD(s, 'gui') displays a dialogue to change the refresh rate.
+      if isempty(varargin)
+        dt = self.timelapse_interval;
+        return
+      elseif isnumeric(varargin{1})
+        dt = varargin{1};
+      elseif ischar(varargin{1}) && strcmp(varargin{1}, 'gui')
+        dt = nan;
+        prompt = {'Enter Time-Lapse Periodicity [s]'};
+        name = 'SonyAlpha: Time-Lapse';
+        options.Resize='on';
+        options.WindowStyle='normal';
+        options.Interpreter='tex';
+        answer=inputdlg(prompt,name, 1, {'30'}, options);
+        if isempty(answer), return; end
+        dt=str2double(answer{1});
+        if ~isfinite(dt), return; end
+      end
+      self.timelapse_interval = dt;
+      
+    end % period
 
     % upper level continuous/timelapse modes
     function continuous(self)
@@ -777,23 +841,19 @@ classdef sonyalpha < handle
       %   A second call will stop the shooting.
       %
       %   TIMELAPSE(s, wait) use 'wait' as interval between pictures (in seconds).
-      if self.timelapse_clock
+      %
+      %   TIMELAPSE(s, 'stop') explicitly stop timelapse/continuous shooting.
+      if self.timelapse_clock || (ischar(wait) && strcmpi(wait, 'stop'))
         % stop after next capture
         self.timelapse_clock = 0;
-        disp([ '[' datestr(now) '] ' mfilename ': stop shooting' ])
+        disp([ '[' datestr(now) '] ' mfilename ': stop shooting.' ])
       else
-        if nargin < 2
-          prompt = {'Enter Time-Lapse Periodicity [s]'};
-          name = 'SonyAlpha: Time-Lapse';
-          options.Resize='on';
-          options.WindowStyle='normal';
-          options.Interpreter='tex';
-          answer=inputdlg(prompt,name, 1, {'30'}, options);
-          if isempty(answer), return; end
-          wait=str2double(answer{1});
-          if ~isfinite(wait), return; end
+        if nargin < 2 || (ischar(wait) && strcmp(wait, 'gui'))
+          wait = period(self,'gui');
+        elseif isnumeric(wait) && isfinite(wait)
+          self.timelapse_interval = wait;
         end
-        self.timelapse_interval = wait;
+        if ~isfinite(wait), return; end
         self.timelapse_clock    = clock;
         if wait > 0
           disp([ '[' datestr(now) '] ' mfilename ': start shooting (timelapse every ' num2str(wait) ' [s])' ]);
@@ -802,6 +862,28 @@ classdef sonyalpha < handle
         end
       end
     end
+    
+    function grid(self, st)
+      % GRID set or toggle lines
+      %   GRID(s, 'on'|'off'|'toggle') controls line display
+      if nargin == 1, st = ''; end
+      if ischar(st)
+        switch lower(st)
+        case 'on'
+          self.show_lines = true;
+        case 'off'
+          self.show_lines = false;
+        case {'','toggle'}
+          self.show_lines = ~self.show_lines;
+        end
+      end
+    end % grid
+    
+    function st = ishold(self)
+      % ISHOLD get the camera status (IDLE, BUSY)
+      %   st = ISHOLD(s) returns 1 when the camera is BUSY.
+      st = ~strcmp(self.cameraStatus, 'IDLE');
+    end % ishold
     
     % Camera settings ----------------------------------------------------------
     function ret = iso(self, value)
@@ -1036,6 +1118,21 @@ end % sonyalpha class
 % camera set-up menu.
 % -----------------------------------------------------------------------
 
+function [h,self] = show_image(self, im)
+  % compute the peak width around pointers
+  if ~isnumeric(im), h = []; return; end
+  h   = image(im,'Parent',self.image_axes); axis tight;
+  im = double(im);
+  % a blurred image has smooth variations. We sum up diff
+  im1 = abs(diff(im,[], 1))/numel(im);
+  im2 = abs(diff(im,[], 2))/numel(im);
+  self.int = sum(im1(:))+sum(im2(:));
+  self.focus_history(end+1) = self.int;
+  if numel(self.focus_history) > 100
+    self.focus_history = self.focus_history((end-99):end);
+  end
+end % show_image
+
 function h = plot_window(self)
 
   h = findall(0, 'Tag', 'SonyAlpha');
@@ -1132,21 +1229,24 @@ function h = plot_window(self)
     uimenu(m0, 'Label', 'Reset', 'Accelerator','r', ...
       'Callback', {@MenuCallback, 'start', self });
       
-    self.axes   = gca;
+    self.image_axes   = gca;
     self.figure = h;
-    set(self.axes, 'Tag', 'SonyAlpha_Axes');
+    set(self.image_axes, 'Tag', 'SonyAlpha_Axes');
+    
+    % we add a button for capture
+    m0 = uicontrol('Style', 'pushbutton', 'String', 'Capture',...
+      'Units','normalized','Position',[ 0 0 0.2 0.1 ], ...
+      'Callback', @(src,evt)image(self),'BackgroundColor','r');
+    
+    % add a small axes to display focus history
+    self.focus_axes = axes('position', [0.7 0.01 0.2 0.08]);
+    set(self.focus_axes, 'Tag', [ class(self) '_focus_axes' ]);
+    set(self.figure, 'Name', [ 'SonyAlpha: ' self.cameraStatus ' ' self.url ]);
   else
     if numel(h) > 1, delete(h(2:end)); h=h(1); end
     set(0, 'CurrentFigure',h);
   end
-  cla(self.axes);
-  set(self.figure, 'HandleVisibility','on', 'NextPlot','add');
-  set(self.figure, 'Name', [ 'SonyAlpha: ' self.cameraStatus ' ' self.url ]);
-  
-  % we add a button for capture
-  m0 = uicontrol('Style', 'pushbutton', 'String', 'Capture',...
-    'Units','normalized','Position',[ 0 0 0.2 0.1 ], ...
-    'Callback', @(src,evt)image(self),'BackgroundColor','r');
+  cla(self.image_axes);
   
 end % plot_window
 
@@ -1156,15 +1256,14 @@ function plot_pointers(src, evnt, self, cmd)
   fig = self.figure;
   if ~ishandle(fig) || isempty(fig), return; end
   set(0, 'CurrentFigure', fig);
-  set(fig, 'HandleVisibility','on', 'NextPlot','add');
   
   for f={'SonyAlpha_Pointers','SonyAlpha_Line1','SonyAlpha_Line2','SonyAlpha_Info'}
     h = findall(0, 'Tag', f{1});
     if ~isempty(h), delete(h); end
   end
   
-  xl = xlim(self.axes);
-  yl = ylim(self.axes);
+  xl = xlim(self.image_axes);
+  yl = ylim(self.image_axes);
     
   if nargin > 3
     switch cmd
@@ -1174,7 +1273,7 @@ function plot_pointers(src, evnt, self, cmd)
       % halt the timer to avoid update during ginput
       flag = self.liveview;
       if flag, self.liveview=false; end
-      axes(self.axes);
+      axes(self.image_axes);
       [x,y] = ginput(1);
       % restart timer if it was running
       if flag, self.liveview=true; end
@@ -1188,39 +1287,35 @@ function plot_pointers(src, evnt, self, cmd)
       self.show_lines = ~self.show_lines;
     end
   end
-  
-  % compute the peak width around pointers
-  h = findall(0, 'Tag', 'SonyAlpha_Image');
-  int = 0;
-  if ~isempty(h) % not implemented yet
-    im = double(get(h, 'CData'));
-    % a blurred image has smooth variations. We sum up diff
-    im1 = abs(diff(im,[], 1))/numel(im);
-    im2 = abs(diff(im,[], 2))/numel(im);
-    self.int = sum(im1(:))+sum(im2(:));
-  end
 
-  hold on
   h = scatter(self.x*max(xl),self.y*max(yl), 400, 'g', '+');
   set(h, 'Tag', 'SonyAlpha_Pointers');
   
   if self.show_lines
     hl = line([ 0 max(xl) ], [ 0 max(yl)]);
-    set(hl, 'LineStyle','--','Tag', 'SonyAlpha_Line1');
+    set(hl, 'LineStyle','--','Tag', 'SonyAlpha_Line1', 'Parent',self.image_axes);
     hl = line([ 0 max(xl) ], [ max(yl) 0]);
-    set(hl, 'LineStyle','--','Tag', 'SonyAlpha_Line2');
+    set(hl, 'LineStyle','--','Tag', 'SonyAlpha_Line2', 'Parent',self.image_axes);
+    % focus history
+    plot(self.focus_axes, self.focus_history);
+    axis(self.focus_axes, 'tight');
+    set(self.focus_axes,'XTickLabel',[],'XTick',[], 'visible','on'); 
+    set(self.focus_axes,'ZTickLabel',[],'ZTick',[]);
+    xlabel(self.focus_axes,' '); ylabel(self.focus_axes,num2str(self.int,3)); zlabel(self.focus_axes,' ');
+  else
+    set(self.focus_axes,'visible','off');
   end
   
   % now display the shutter F exp ISO
-  t = text(0.05*max(xl), .95*max(yl), char(self));
-  if ~strcmp(self.cameraStatus, 'IDLE') % BUSY
+  t = text(0.05*max(xl), .95*max(yl), char(self), 'Parent',self.image_axes);
+  if ishold(self) % BUSY
     set(t,'Color', 'r', 'FontSize', 18, 'Tag', 'SonyAlpha_Info');
+    set(self.image_axes,'XColor','r','YColor','r');
   else
     set(t,'Color', 'y', 'FontSize', 18, 'Tag', 'SonyAlpha_Info');
+    set(self.image_axes,'XColor','k','YColor','k');
   end
   set(self.figure, 'Name', [ 'SonyAlpha: ' self.cameraStatus ' ' self.url ]);
-
-  set(fig, 'HandleVisibility','off', 'NextPlot','new');
   
 end % plot_pointers
 
@@ -1253,11 +1348,11 @@ function ButtonDownCallback(src, evnt, self)
   
   if strcmp(get(self.figure, 'SelectionType'),'alt')
     
-    xy = get(self.axes, 'CurrentPoint'); 
+    xy = get(self.image_axes, 'CurrentPoint'); 
     x = xy(1,1); y = xy(1,2);
 
-    self.x(end+1) = x/max(xlim(self.axes));
-    self.y(end+1) = y/max(ylim(self.axes));
+    self.x(end+1) = x/max(xlim(self.image_axes));
+    self.y(end+1) = y/max(ylim(self.image_axes));
     
     plot_pointers('','',self);
   end
@@ -1312,7 +1407,7 @@ function TimerCallback(src, evnt)
   end
   
   % handle continuous shooting mode: do something when camera is IDLE
-  if strcmpi(self.cameraStatus,'IDLE')
+  if ~ishold(self) % IDLE
     if any(self.timelapse_clock) && etime(clock, self.timelapse_clock) > self.timelapse_interval
       background(self); % take a new picture (background execution)
     end
@@ -1324,10 +1419,9 @@ function TimerCallback(src, evnt)
     % read the image and display it. delete tmp file.
     im  = imread(filename);
     fig = plot_window(self);
-    h   = image(im); axis tight;
+    [h,self]   = show_image(self, im);
     set(h, 'ButtonDownFcn',        {@ButtonDownCallback, self}, ...
       'Tag', 'SonyAlpha_Image');
-    set(fig, 'HandleVisibility','off', 'NextPlot','new');
     delete(filename);
     plot_pointers('','',self);
     
