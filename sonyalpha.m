@@ -4,7 +4,7 @@ classdef sonyalpha < handle
   % https://developer.sony.com/file/download/sony-camera-remote-api-beta-sdk-2/
   %
   % The list of officially supported cameras is: 
-  % - Alpha 7, R 7S, 7RII, 7SII, 5000, 5100, 6000, 6300, 6500, 
+  % - Alpha 7,  R,  7S, 7RII, 7SII, 5000, 5100, 6000, 6300, 6500, 
   % - NEX   5R, 5T, 6
   %
   % Usage
@@ -55,6 +55,8 @@ classdef sonyalpha < handle
   % If you need to specify the camera IP, use:
   %
   % >> camera = sonyalpha('http://192.168.122.1:8080');
+  %
+  % You may as well use the simulation mode with: camera = sonyalpha('sim')
   %
   % Using the Plot Window
   % ---------------------
@@ -690,7 +692,7 @@ classdef sonyalpha < handle
       if ischar(im) && ~isempty(dir(im)), im = imread(im); end
       fig        = plot_window(self);
       h          = image(im); axis tight;
-      if isfield(exif, 'Filename') title(exif.Filename, 'Interpreter','none'); end
+      if isfield(exif, 'Filename') title([ '[' datestr(clock) '] ' exif.Filename ], 'Interpreter','none'); end
       set(h, 'ButtonDownFcn',        {@ButtonDownCallback, self}, ...
         'Tag', 'SonyAlpha_Image');
       set(fig, 'HandleVisibility','off', 'NextPlot','new');
@@ -1062,12 +1064,17 @@ function h = plot_window(self)
       'Callback', {@plot_pointers, self, 'clear'});
     uimenu(m0, 'Label', 'Show/Hide Lines', ...
       'Callback', {@plot_pointers, self, 'toggle'});
+      
     m1 = uimenu(m0, 'Label', 'Auto Update', ...
-      'Callback', {@MenuCallback, 'autoupdate', self }, 'Separator','on');
+      'Callback', {@MenuCallback, 'autoupdate', self });
     if self.liveview, set(m1, 'Checked','on');
     else              set(m1, 'Checked','off'); end
+    
+    uimenu(m0, 'Label', 'Update Live-View', 'Accelerator','u', ...
+      'Callback', {@MenuCallback, 'plot', self });
+      
     uimenu(m0, 'Label', 'Help', ...
-      'Callback', {@MenuCallback, 'help', self });
+      'Callback', {@MenuCallback, 'help', self }, 'Separator','on');
     uimenu(m0, 'Label', 'About Sony Alpha', ...
       'Callback', {@MenuCallback, 'about', self });
     
@@ -1112,12 +1119,9 @@ function h = plot_window(self)
       'Callback', {@MenuCallback,'zoom', self, 'out'}, ...
       'Accelerator','o');
   
-    m0 = uimenu(h, 'Label', 'Shoot');
-    uimenu(m0, 'Label', 'Update Live-View', 'Accelerator','u', ...
-      'Callback', {@MenuCallback, 'plot', self });
-    uimenu(m0, 'Label', 'Reset', 'Accelerator','r', ...
-      'Callback', {@MenuCallback, 'start', self });
-    labs = { 'Single',                    'image'; ...
+    m0 = uimenu(h, 'Label', 'Camera');
+    
+    labs = { 'Capture image',             'image'; ...
              'Continuous Start/Stop',     'continuous'; ...
              'Time-Lapse Start/Stop...',  'timelapse' };
     for index1 = 1:size(labs, 1)
@@ -1125,6 +1129,9 @@ function h = plot_window(self)
       m1        = uimenu(m0, 'Label', labs{index1,1}, ...
         'Callback', {@MenuCallback, method, self });
     end
+    uimenu(m0, 'Label', 'Reset', 'Accelerator','r', ...
+      'Callback', {@MenuCallback, 'start', self });
+      
     self.axes   = gca;
     self.figure = h;
     set(self.axes, 'Tag', 'SonyAlpha_Axes');
@@ -1135,6 +1142,11 @@ function h = plot_window(self)
   cla(self.axes);
   set(self.figure, 'HandleVisibility','on', 'NextPlot','add');
   set(self.figure, 'Name', [ 'SonyAlpha: ' self.cameraStatus ' ' self.url ]);
+  
+  % we add a button for capture
+  m0 = uicontrol('Style', 'pushbutton', 'String', 'Capture',...
+    'Units','normalized','Position',[ 0 0 0.2 0.1 ], ...
+    'Callback', @(src,evt)image(self),'BackgroundColor','r');
   
 end % plot_window
 

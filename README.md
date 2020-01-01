@@ -35,6 +35,8 @@ Connecting the Camera
 ```matlab
 >> camera = sonyalpha('http://192.168.122.1:8080');
 ```
+
+You may as well use the simulation mode with: camera = sonyalpha('sim')
   
 Using the Plot Window
 ---------------------
@@ -125,7 +127,7 @@ Credits
 - https://developer.sony.com/develop/cameras/#overview-content
 - https://developer.sony.com/file/download/sony-camera-remote-api-beta-sdk-2/
  
-(c) E. Farhi, GPL2, 2018.
+(c) E. Farhi, GPL2, 2019.
 
 
 
