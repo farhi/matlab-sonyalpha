@@ -45,7 +45,7 @@ classdef sonyalpha < handle
   % Start your camera and use its Remote Control App (e.g. Play Memories App) 
   % from the Camera settings. This starts the JSON REST HTTP server, used to 
   % control the camera. The Network SSID is shown on the Camera screen.
-  % Connect from your PC on that network.
+  % Connect from your PC on that Wifi network.
   % The usual associated IP is then 192.168.122.1 (port 8080)
   %
   % The connection must be a dedicated ad-hoc, e.g. can NOT use an intermediate 
@@ -591,7 +591,7 @@ classdef sonyalpha < handle
       waitme = true;
       while waitme
         if iscell(url) && isnumeric(url{1}) && isequal(url{1}, 40403)
-          plot_pointers('','',self); % set display to BUSY
+          plot_pointers(self); % set display to BUSY
           drawnow
           url = self.api('awaitTakePicture');
         else
@@ -732,7 +732,7 @@ classdef sonyalpha < handle
       if isfield(exif, 'Filename') title([ '[' datestr(clock) '] ' exif.Filename ], 'Interpreter','none'); end
       set(h, 'ButtonDownFcn',        {@ButtonDownCallback, self}, ...
         'Tag', 'SonyAlpha_Image');
-      plot_pointers('','',self);
+      plot_pointers(self);
     end % image
     
     function capture(self)
@@ -799,7 +799,7 @@ classdef sonyalpha < handle
         set(h, 'ButtonDownFcn',        {@ButtonDownCallback, self}, ...
           'Tag', 'SonyAlpha_Image');
         delete(filename);
-        plot_pointers('','',self);
+        plot_pointers(self);
       end
       
     end % plot
@@ -1140,7 +1140,7 @@ function h = plot_window(self)
     % build the plot/menu window
     h = figure('Tag', 'SonyAlpha', ...
       'UserData', self, 'MenuBar','none', ...
-      'CloseRequestFcn', {@MenuCallback, 'stop', self });
+      'CloseRequestFcn', @(src,evt)stop(self));
       
     % File menu
     m = uimenu(h, 'Label', 'File');
@@ -1151,29 +1151,30 @@ function h = plot_window(self)
     uimenu(m, 'Label', 'Print',        ...
       'Callback', 'printdlg(gcbf)');
     uimenu(m, 'Label', 'Close',        ...
-      'Callback', {@MenuCallback, 'stop', self }, ...
+      'Callback', @(src,evt)stop(self), ...
       'Accelerator','w', 'Separator','on');
       
     m0 = uimenu(h, 'Label', 'View');
     uimenu(m0, 'Label', 'Add pointer', ...
-      'Callback', {@plot_pointers, self, 'new'});
+      'Callback', @(src,evt)plot_pointers(self, 'new'));
     uimenu(m0, 'Label', 'Clear pointers', ...
-      'Callback', {@plot_pointers, self, 'clear'});
+      'Callback', @(src,evt)plot_pointers(self, 'clear'));
     uimenu(m0, 'Label', 'Show/Hide Lines', ...
-      'Callback', {@plot_pointers, self, 'toggle'});
+      'Callback', @(src,evt)plot_pointers(self, 'toggle'));
       
     m1 = uimenu(m0, 'Label', 'Auto Update', ...
-      'Callback', {@MenuCallback, 'autoupdate', self });
+      'Callback', @(src,evt)plot_pointers(self, 'autoupdate'), ...
+      'Tag','SonyAlpha_AutoUpdate');
     if self.liveview, set(m1, 'Checked','on');
     else              set(m1, 'Checked','off'); end
     
     uimenu(m0, 'Label', 'Update Live-View', 'Accelerator','u', ...
-      'Callback', {@MenuCallback, 'plot', self });
+      'Callback', @(src,evt)plot( self ));
       
     uimenu(m0, 'Label', 'Help', ...
-      'Callback', {@MenuCallback, 'help', self }, 'Separator','on');
+      'Callback', @(src,evt)help(self ), 'Separator','on');
     uimenu(m0, 'Label', 'About Sony Alpha', ...
-      'Callback', {@MenuCallback, 'about', self });
+      'Callback', @(src,evt)about(self ));
     
     % Settings menu
     m0 = uimenu(h, 'Label', 'Settings');
@@ -1204,16 +1205,16 @@ function h = plot_window(self)
           end
           if ischar(available{index2}) || isnumeric(available{index2})
             m2 = uimenu(m1, 'Label', num2str(available{index2}), ...
-              'Callback', {@MenuCallback, method, self, available{index2} });
+              'Callback', @(src,evt)feval(method, self, available{index2}));
           end
         end
       end
     end
     uimenu(m0, 'Label', 'Zoom in',  ...
-      'Callback', {@MenuCallback, 'zoom', self, 'in'},...
+      'Callback', @(src,evt)zoom(self, 'in'),...
       'Accelerator','i', 'Separator','on');
     uimenu(m0, 'Label', 'Zoom out', ...
-      'Callback', {@MenuCallback,'zoom', self, 'out'}, ...
+      'Callback', @(src,evt)zoom(self, 'out'), ...
       'Accelerator','o');
   
     m0 = uimenu(h, 'Label', 'Camera');
@@ -1224,10 +1225,10 @@ function h = plot_window(self)
     for index1 = 1:size(labs, 1)
       method    = labs{index1,2};
       m1        = uimenu(m0, 'Label', labs{index1,1}, ...
-        'Callback', {@MenuCallback, method, self });
+        'Callback', @(src,evt)feval(method, self ));
     end
     uimenu(m0, 'Label', 'Reset', 'Accelerator','r', ...
-      'Callback', {@MenuCallback, 'start', self });
+      'Callback', @(src,evt)start(self ));
       
     self.image_axes   = gca;
     self.figure = h;
@@ -1250,7 +1251,7 @@ function h = plot_window(self)
   
 end % plot_window
 
-function plot_pointers(src, evnt, self, cmd)
+function plot_pointers(self, cmd)
   % plot pointers and marks
   
   fig = self.figure;
@@ -1265,7 +1266,7 @@ function plot_pointers(src, evnt, self, cmd)
   xl = xlim(self.image_axes);
   yl = ylim(self.image_axes);
     
-  if nargin > 3
+  if nargin > 1
     switch cmd
     case 'new'
       % add a new pointer
@@ -1285,10 +1286,16 @@ function plot_pointers(src, evnt, self, cmd)
       self.y = [];
     case 'toggle'
       self.show_lines = ~self.show_lines;
+    case 'autoupdate'
+      self.liveview = ~self.liveview;
+      src = findobj(self.figure, 'Tag','SonyAlpha_AutoUpdate');
+      if self.liveview, set(src, 'Checked','on');
+      else              set(src, 'Checked','off'); end
     end
   end
-
-  h = scatter(self.x*max(xl),self.y*max(yl), 400, 'g', '+');
+  
+  hold(self.image_axes, 'on');
+  h = scatter(self.x*max(xl),self.y*max(yl), 400, 'g', '+', 'Parent', self.image_axes);
   set(h, 'Tag', 'SonyAlpha_Pointers');
   
   if self.show_lines
@@ -1305,6 +1312,7 @@ function plot_pointers(src, evnt, self, cmd)
   else
     set(self.focus_axes,'visible','off');
   end
+  hold(self.image_axes, 'off');
   
   % now display the shutter F exp ISO
   t = text(0.05*max(xl), .95*max(yl), char(self), 'Parent',self.image_axes);
@@ -1323,22 +1331,6 @@ end % plot_pointers
 % CallBacks
 % ------------------------------------------------------------------------------
 
-function MenuCallback(src, evnt, varargin)
-  % menu actions, as stored in the uimenu UserData
-
-  arg = get(src, 'UserData');
-  
-  if numel(varargin) > 1 && strcmp(varargin{1}, 'autoupdate')
-    self = varargin{2};
-    self.liveview = ~self.liveview;
-    if self.liveview, set(src, 'Checked','on');
-    else              set(src, 'Checked','off'); end
-  else
-    feval(varargin{:});
-  end
-
-end % MenuCallback
-
 function ButtonDownCallback(src, evnt, self)
   % ButtonDownCallback: callback when user clicks on the StarBook image
   % where the mouse click is
@@ -1354,7 +1346,7 @@ function ButtonDownCallback(src, evnt, self)
     self.x(end+1) = x/max(xlim(self.image_axes));
     self.y(end+1) = y/max(ylim(self.image_axes));
     
-    plot_pointers('','',self);
+    plot_pointers(self);
   end
   
 end % ButtonDownCallback
@@ -1366,7 +1358,7 @@ function TimerCallback(src, evnt)
   % TimerCallback: update from timer event
   self = get(src, 'UserData');
   if isvalid(self), 
-    try; self.getstatus; plot_pointers('','',self); end
+    try; self.getstatus; plot_pointers(self); end
   else delete(src); return; end
   
   % check if a background command is running. Is it finished ?
@@ -1423,7 +1415,7 @@ function TimerCallback(src, evnt)
     set(h, 'ButtonDownFcn',        {@ButtonDownCallback, self}, ...
       'Tag', 'SonyAlpha_Image');
     delete(filename);
-    plot_pointers('','',self);
+    plot_pointers(self);
     
     % trigger new image
     plot(self);
