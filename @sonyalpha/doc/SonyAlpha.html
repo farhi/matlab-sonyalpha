@@ -36,6 +36,7 @@
 
 
 
+
       a Sony Alpha Camera</p>
     <div align="center"><a
 href="https://github.com/farhi/matlab-sonyalpha/blob/master/doc/A6000.png"
@@ -143,6 +144,7 @@ href="https://github.com/farhi/matlab-sonyalpha/blob/master/doc/A6000.png"
             13 12H9c-.98 0-2-1.22-2-2.5 0-.83.42-1.64
             1-2.09V6.25c-1.09.53-2 1.84-2 3.25C6 11.31 7.55 13 9
             13h4c1.45 0 3-1.69 3-3.5S14.5 6 13 6z"></path></svg></a>Connecting
+
       the Camera</h2>
     <p style="box-sizing: border-box; margin-top: 0px; margin-bottom:
       16px; color: rgb(36, 41, 46); font-family: -apple-system,
@@ -278,10 +280,10 @@ href="https://github.com/farhi/matlab-sonyalpha/blob/master/doc/SonyAlpha_image.
       start; text-indent: 0px; text-transform: none; white-space:
       normal; widows: 2; word-spacing: 0px; -webkit-text-stroke-width:
       0px; background-color: rgb(255, 255, 255); text-decoration-style:
-      initial; text-decoration-color: initial;">The View menu allows to
-      add Pointers and Marks on top of the current image. These can be
-      used for e.g. alignment. You can equally add Pointers directly
-      right-clicking on the image.</p>
+      initial; text-decoration-color: initial;">The <b>View</b> menu
+      allows to add Pointers and Marks on top of the current image.
+      These can be used for e.g. alignment. You can equally add Pointers
+      directly right-clicking on the image.</p>
     <p style="box-sizing: border-box; margin-top: 0px; margin-bottom:
       16px; color: rgb(36, 41, 46); font-family: -apple-system,
       BlinkMacSystemFont, &quot;Segoe UI&quot;, Helvetica, Arial,
@@ -292,9 +294,9 @@ href="https://github.com/farhi/matlab-sonyalpha/blob/master/doc/SonyAlpha_image.
       start; text-indent: 0px; text-transform: none; white-space:
       normal; widows: 2; word-spacing: 0px; -webkit-text-stroke-width:
       0px; background-color: rgb(255, 255, 255); text-decoration-style:
-      initial; text-decoration-color: initial;">The Settings menu allows
-      to change the most important camera settings, including the zoom
-      level (when available).</p>
+      initial; text-decoration-color: initial;">The <b>Settings</b>
+      menu allows to change the most important camera settings,
+      including the zoom level (when available).</p>
     <p style="box-sizing: border-box; margin-top: 0px; margin-bottom:
       16px; color: rgb(36, 41, 46); font-family: -apple-system,
       BlinkMacSystemFont, &quot;Segoe UI&quot;, Helvetica, Arial,
@@ -305,10 +307,64 @@ href="https://github.com/farhi/matlab-sonyalpha/blob/master/doc/SonyAlpha_image.
       start; text-indent: 0px; text-transform: none; white-space:
       normal; widows: 2; word-spacing: 0px; -webkit-text-stroke-width:
       0px; background-color: rgb(255, 255, 255); text-decoration-style:
-      initial; text-decoration-color: initial;">The Shoot menu allows to
-      take a single picture, update the live view (lower resolution), as
-      well as start a continuous or timelapse shooting. To stop the
-      continuous/timelapse session, select the Shoot item again.</p>
+      initial; text-decoration-color: initial;">The <b>Camera</b> menu
+      allows to take a single picture, update the live view (lower
+      resolution), as well as start a continuous or timelapse shooting.
+      To stop the continuous/timelapse session, select the Shoot item
+      again.<br>
+    </p>
+    <h2>Monitoring the camera<br>
+    </h2>
+    <p style="box-sizing: border-box; margin-top: 0px; margin-bottom:
+      16px; color: rgb(36, 41, 46); font-family: -apple-system,
+      BlinkMacSystemFont, &quot;Segoe UI&quot;, Helvetica, Arial,
+      sans-serif, &quot;Apple Color Emoji&quot;, &quot;Segoe UI
+      Emoji&quot;; font-size: 16px; font-style: normal;
+      font-variant-ligatures: normal; font-variant-caps: normal;
+      font-weight: 400; letter-spacing: normal; orphans: 2; text-align:
+      start; text-indent: 0px; text-transform: none; white-space:
+      normal; widows: 2; word-spacing: 0px; -webkit-text-stroke-width:
+      0px; background-color: rgb(255, 255, 255); text-decoration-style:
+      initial; text-decoration-color: initial;">The <b>captureStart</b>
+      and <b>captureStop</b> events are triggered when a capture is
+      initiated/finalised. You may then monitor these events with e.g.<br>
+    </p>
+    <ul>
+      <li>&nbsp;so = sonyalpha;</li>
+      <li>&nbsp;addlistener(so, 'captureStop', @(src,evt)disp('capture
+        just ended'))<br>
+      </li>
+    </ul>
+    <p style="box-sizing: border-box; margin-top: 0px; margin-bottom:
+      16px; color: rgb(36, 41, 46); font-family: -apple-system,
+      BlinkMacSystemFont, &quot;Segoe UI&quot;, Helvetica, Arial,
+      sans-serif, &quot;Apple Color Emoji&quot;, &quot;Segoe UI
+      Emoji&quot;; font-size: 16px; font-style: normal;
+      font-variant-ligatures: normal; font-variant-caps: normal;
+      font-weight: 400; letter-spacing: normal; orphans: 2; text-align:
+      start; text-indent: 0px; text-transform: none; white-space:
+      normal; widows: 2; word-spacing: 0px; -webkit-text-stroke-width:
+      0px; background-color: rgb(255, 255, 255); text-decoration-style:
+      initial; text-decoration-color: initial;">For instance, for
+      astrophotography you may automatically annotate new images:<br>
+    </p>
+    <ol>
+      <li>install https://github.com/farhi/matlab-astrometry</li>
+      <li>addlistener(so, 'captureStop',
+        @(src,evt)astrometry(so.lastImageFile, 'scale-low', 0.5,
+        'scale-high',2, 'autoplot'))</li>
+    </ol>
+    <p style="box-sizing: border-box; margin-top: 0px; margin-bottom:
+      16px; color: rgb(36, 41, 46); font-family: -apple-system,
+      BlinkMacSystemFont, &quot;Segoe UI&quot;, Helvetica, Arial,
+      sans-serif, &quot;Apple Color Emoji&quot;, &quot;Segoe UI
+      Emoji&quot;; font-size: 16px; font-style: normal;
+      font-variant-ligatures: normal; font-variant-caps: normal;
+      font-weight: 400; letter-spacing: normal; orphans: 2; text-align:
+      start; text-indent: 0px; text-transform: none; white-space:
+      normal; widows: 2; word-spacing: 0px; -webkit-text-stroke-width:
+      0px; background-color: rgb(255, 255, 255); text-decoration-style:
+      initial; text-decoration-color: initial;"></p>
     <h2 style="box-sizing: border-box; margin-top: 24px; margin-bottom:
       16px; font-weight: 600; font-size: 1.5em; line-height: 1.25;
       padding-bottom: 0.3em; border-bottom: 1px solid rgb(234, 236,
@@ -350,6 +406,7 @@ href="https://github.com/farhi/matlab-sonyalpha/blob/master/doc/SonyAlpha_image.
       <li style="box-sizing: border-box;">about Display camera settings
         in a dialogue window.</li>
       <li style="box-sizing: border-box; margin-top: 0.25em;">addlistener
+
         Add listener for event.</li>
       <li style="box-sizing: border-box; margin-top: 0.25em;">api Call
         the camera API with method.</li>
@@ -395,6 +452,7 @@ href="https://github.com/farhi/matlab-sonyalpha/blob/master/doc/SonyAlpha_image.
       <li style="box-sizing: border-box; margin-top: 0.25em;">isvalid
         Test handle validity.</li>
       <li style="box-sizing: border-box; margin-top: 0.25em;">lastImageFile
+
         Return the last image file name (or URL).</li>
       <li style="box-sizing: border-box; margin-top: 0.25em;">mode
         Get/set the shooting Mode (e.g. PASM).</li>

@@ -99,6 +99,18 @@ Methods
 - waitfor       Wait for the camera to be idle.   
 - white         Get/set the white balance setting.   
 - zoom          Get/set the zoom value. 
+
+Monitoring the camera
+---------------------
+The captureStart and captureStop events are triggered when a capture is
+initiated/finalised. You may then monitor these events with e.g.
+   so = sonyalpha;
+   addlistener(so, 'captureStop', @(src,evt)disp('capture just ended'))
+ 
+For instance, for astrophotography you may automatically annotate new images:
+ - install https://github.com/farhi/matlab-astrometry
+ - addlistener(so, 'captureStop', ...
+   @(src,evt)astrometry(so.lastImageFile, 'scale-low', 0.5, 'scale-high',2,'autoplot'))
   
 Requirements/Installation
 -------------------------

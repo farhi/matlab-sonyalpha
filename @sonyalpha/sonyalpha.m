@@ -83,6 +83,11 @@ classdef sonyalpha < handle
   %    so = sonyalpha;
   %    addlistener(so, 'captureStop', @(src,evt)disp('capture just ended'))
   %
+  %  For instance, for astrophotography you may automatically annotate new images:
+  %  - install https://github.com/farhi/matlab-astrometry
+  %  - addlistener(so, 'captureStop', ...
+  %    @(src,evt)astrometry(so.lastImageFile, 'scale-low', 0.5, 'scale-high',2,'autoplot'))
+  %
   % Requirements/Installation
   % -------------------------
   %
@@ -374,7 +379,7 @@ classdef sonyalpha < handle
       if isdeployed || ~usejava('jvm') || ~usejava('desktop'), id=class(self);
       else id=[  '<a href="matlab:doc ' class(self) '">' class(self) '</a> ' ...
                  '(<a href="matlab:methods ' class(self) '">methods</a>,' ...
-                 '<a href="matlab:image(' iname ');">shoot</a>,' ...
+                 '<a href="matlab:image(' iname ');">capture</a>,' ...
                  '<a href="matlab:disp(' iname ');">more...</a>)' ];
       end
       if ~isempty(self.lastImageURL) 
@@ -1295,8 +1300,10 @@ function plot_pointers(self, cmd)
   end
   
   hold(self.image_axes, 'on');
-  h = scatter(self.x*max(xl),self.y*max(yl), 400, 'g', '+', 'Parent', self.image_axes);
-  set(h, 'Tag', 'SonyAlpha_Pointers');
+  if numel(self.x)
+    h = scatter(self.x*max(xl),self.y*max(yl), 400, 'g', '+', 'Parent', self.image_axes);
+    set(h, 'Tag', 'SonyAlpha_Pointers');
+  end
   
   if self.show_lines
     hl = line([ 0 max(xl) ], [ 0 max(yl)]);
