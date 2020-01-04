@@ -109,8 +109,8 @@ initiated/finalised. You may then monitor these events with e.g.
  
 For instance, for astrophotography you may automatically annotate new images:
  - install https://github.com/farhi/matlab-astrometry
- - addlistener(so, 'captureStop', ...
-   @(src,evt)astrometry(so.lastImageFile, 'scale-low', 0.5, 'scale-high',2,'autoplot'))
+ - as=astrometry('null','autoplot');
+ - addlistener(so, 'captureStop', @(src,evt)local(as, so.lastImageFile, 'scale-low', 0.5, 'scale-high',2));
   
 Requirements/Installation
 -------------------------

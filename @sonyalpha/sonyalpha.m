@@ -85,8 +85,9 @@ classdef sonyalpha < handle
   %
   %  For instance, for astrophotography you may automatically annotate new images:
   %  - install https://github.com/farhi/matlab-astrometry
+  %  - as=astrometry('null','autoplot');
   %  - addlistener(so, 'captureStop', ...
-  %    @(src,evt)astrometry(so.lastImageFile, 'scale-low', 0.5, 'scale-high',2,'autoplot'))
+  %    @(src,evt)local(as, so.lastImageFile, 'scale-low', 0.5, 'scale-high',2));
   %
   % Requirements/Installation
   % -------------------------
@@ -189,7 +190,7 @@ classdef sonyalpha < handle
       ip = regexp(self.url, '([012]?\d{1,2}\.){3}[012]?\d{1,2}','match');
       ip = java.net.InetAddress.getByName(char(ip));
       if ~ip.isReachable(1000)
-        disp([ mfilename ': IP ' self.url ' is not reachable. ' ])
+        disp([ '[' datestr(now) ']: ' mfilename   ': IP ' self.url ' is not reachable. ' ])
         disp('*** Switching to simulate mode.');
         self.url = 'sim';
       end
@@ -198,7 +199,7 @@ classdef sonyalpha < handle
         ret = self.api('startRecMode');
       catch ME
         getReport(ME)
-        error([ mfilename ': No Camera found.' ]);
+        error([ '[' datestr(now) ']: ' mfilename  ': No Camera found.' ]);
       end
 
       vers = self.api('getApplicationInfo');
@@ -227,7 +228,7 @@ classdef sonyalpha < handle
       end
        
       % init timer for regular updates, timelapse, etc
-      disp([ mfilename ': [' datestr(now) '] Welcome to Sony Alpha ' num2str(self.version) ' at ' char(self.url) ]);
+      disp([ '[' datestr(now) ']: ' mfilename  ': Welcome to Sony Alpha ' num2str(self.version) ' at ' char(self.url) ]);
       self.ffmpeg = ffmpeg_check;
       
       self.updateTimer  = timer('TimerFcn', @TimerCallback, ...
@@ -278,7 +279,7 @@ classdef sonyalpha < handle
       
       if ret % error
         disp(cmd)
-        disp([ mfilename ': Connection failed: ' url])
+        disp([ '[' datestr(now) ']: ' mfilename  ': Connection failed: ' url])
         disp('*** You need to restart the SonyAlpha with: start(s)');
         error(message);
       end
@@ -380,6 +381,7 @@ classdef sonyalpha < handle
       else id=[  '<a href="matlab:doc ' class(self) '">' class(self) '</a> ' ...
                  '(<a href="matlab:methods ' class(self) '">methods</a>,' ...
                  '<a href="matlab:image(' iname ');">capture</a>,' ...
+                 '<a href="matlab:plot(' iname ')">plot</a>,' ...
                  '<a href="matlab:disp(' iname ');">more...</a>)' ];
       end
       if ~isempty(self.lastImageURL) 
@@ -405,7 +407,8 @@ classdef sonyalpha < handle
       if isdeployed || ~usejava('jvm') || ~usejava('desktop'), id=class(self);
       else id=[  '<a href="matlab:doc ' class(self) '">' class(self) '</a> ' ...
                  '(<a href="matlab:methods ' class(self) '">methods</a>,' ...
-                 '<a href="matlab:image(' iname ');">shoot</a>)' ];
+                 '<a href="matlab:image(' iname ');">capture</a>)' ...
+                 '<a href="matlab:plot(' iname ')">plot</a>' ];
       end
       fprintf(1,'%s = %s [%s] \n',iname, id, char(self));
       % display settings
@@ -535,7 +538,7 @@ classdef sonyalpha < handle
     
     function id = identify(self)
       id = [ 'Sony Alpha camera on ' self.url ' ' self.version ];
-      disp([ mfilename ': connected to ' id ]);
+      disp([ '[' datestr(now) ']: ' mfilename  ': connected to ' id ]);
     end % identify
     
     function waitfor(self)
@@ -613,7 +616,7 @@ classdef sonyalpha < handle
         if self.verbose, disp([ '[' datestr(now) '] ' fullfile(self.dir, char(self.lastImageURL))]); end
       else
         self.start; % try to start the camera
-        disp([ mfilename ': camera is not ready.' ]);
+        disp([ '[' datestr(now) ']: ' mfilename  ': camera is not ready.' ]);
       end
     end % urlread
     
@@ -735,8 +738,10 @@ classdef sonyalpha < handle
       fig        = plot_window(self);
       [h,self]   = show_image(self, im);
       if isfield(exif, 'Filename') title([ '[' datestr(clock) '] ' exif.Filename ], 'Interpreter','none'); end
-      set(h, 'ButtonDownFcn',        {@ButtonDownCallback, self}, ...
-        'Tag', 'SonyAlpha_Image');
+      if ~isempty(h)
+        set(h, 'ButtonDownFcn',        {@ButtonDownCallback, self}, ...
+          'Tag', 'SonyAlpha_Image');
+        end
       plot_pointers(self);
     end % image
     
@@ -788,6 +793,8 @@ classdef sonyalpha < handle
           
           [ret, message] = system(cmd);
           self.api('stopLiveView');
+        elseif strcmp(self.url, 'sim')
+          filename = self.lastImageFile;
         else return
         end
 
@@ -851,7 +858,7 @@ classdef sonyalpha < handle
       if self.timelapse_clock || (ischar(wait) && strcmpi(wait, 'stop'))
         % stop after next capture
         self.timelapse_clock = 0;
-        disp([ '[' datestr(now) '] ' mfilename ': stop shooting.' ])
+        disp([ '[' datestr(now) ']: ' mfilename  ': stop shooting.' ])
       else
         if nargin < 2 || (ischar(wait) && strcmp(wait, 'gui'))
           wait = period(self,'gui');
@@ -1339,7 +1346,7 @@ end % plot_pointers
 % ------------------------------------------------------------------------------
 
 function ButtonDownCallback(src, evnt, self)
-  % ButtonDownCallback: callback when user clicks on the StarBook image
+  % ButtonDownCallback: callback when user clicks on the image
   % where the mouse click is
 
   fig = self.figure;
@@ -1380,7 +1387,7 @@ function TimerCallback(src, evnt)
       elseif iscellstr(url) || ischar(url)
         try
           url = char(url);
-          disp([ mfilename ': [' datestr(now) ']: ' url ]);
+          disp([ '[' datestr(now) ']: ' mfilename  ': ' url ]);
           self.json         = url;
           % in case result is error 40403 "Long Exposure" "Still Capturing Not Finished"
           % then re-send self.api('awaitTakePicture') until we obtain a result with URL.
@@ -1396,7 +1403,7 @@ function TimerCallback(src, evnt)
           notify(self, 'captureStop');
           notify(self, 'idle');
         catch
-          disp([ mfilename ': error in sonyalpha timer callback'])
+          disp([ '[' datestr(now) ']: ' mfilename  ': error in sonyalpha timer callback'])
           whos
           url{:}
         end
