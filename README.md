@@ -1,7 +1,7 @@
 # matlab-sonyalpha
 Control a Sony Alpha Camera
 
-![Image of A6000](https://github.com/farhi/matlab-sonyalpha/blob/master/doc/A6000.png)
+![Image of A6000](https://github.com/farhi/matlab-sonyalpha/blob/master/%40sonyalpha/doc/A6000.png)
 
 SONYALPHA: A class to control a Sony Alpha Camera (NEX, Alpha, ...) compatible
   with the Camera Remote API by Sony.
@@ -41,7 +41,7 @@ You may as well use the simulation mode with: camera = sonyalpha('sim')
 Using the Plot Window
 ---------------------
 
-![Image of SonyAlpha](https://github.com/farhi/matlab-sonyalpha/blob/master/doc/SonyAlpha_image.png)
+![Image of SonyAlpha](https://github.com/farhi/matlab-sonyalpha/blob/master/%40sonyalpha/doc/SonyAlpha_image.png)
 
   The Plot window is shown when shooting still images or updating the LiveView. It
   contains the File, View, Settings and Shoot menus. It also shows the main
