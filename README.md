@@ -1,6 +1,8 @@
 # matlab-sonyalpha
 Control a Sony Alpha Camera
 
+:warning: This project has been moved to Gitlab at https://gitlab.com/astrophotography/matlab-sonyalpha
+
 ![Image of A6000](https://github.com/farhi/matlab-sonyalpha/blob/master/%40sonyalpha/doc/A6000.png)
 
 SONYALPHA: A class to control a Sony Alpha Camera (NEX, Alpha, ...) compatible
