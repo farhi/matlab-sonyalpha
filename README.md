@@ -1,7 +1,7 @@
 # matlab-sonyalpha
 Control a Sony Alpha Camera
 
-:warning: This project has been moved to Gitlab at https://gitlab.com/astrophotography/matlab-sonyalpha
+:warning: This project has been moved to Gitlab at https://gitlab.com/astrophotography/matlab-sonyalpha This Github repo will be kept rather inactive.
 
 ![Image of A6000](https://github.com/farhi/matlab-sonyalpha/blob/master/%40sonyalpha/doc/A6000.png)
 
